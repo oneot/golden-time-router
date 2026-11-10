@@ -655,7 +655,7 @@ const Holo = (() => {
     const n = S.data ? S.ringN : 4; ctx.lineWidth = DPR;
     for (let k = 1; k <= n; k++) { ctx.strokeStyle = k === n ? "rgba(139,92,246,.5)" : "rgba(103,232,249,.17)"; ctx.setLineDash(k === n ? [] : [3 * DPR, 5 * DPR]); ctx.beginPath(); ctx.arc(cx, cy, R * k / n, 0, TAU); ctx.stroke(); }
     ctx.setLineDash([]); ctx.strokeStyle = "rgba(103,232,249,.13)"; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
-    if (S.data && RD.lab > .01) {
+    if (S.data && !S.approx && RD.lab > .01) {
       ctx.globalAlpha = ga * RD.lab; ctx.font = "500 " + 10 * DPR + "px " + MONO; ctx.fillStyle = "rgba(143,243,255,.8)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
       const a = -Math.PI / 4 - .12; for (let k = 1; k <= n; k++) { const r = R * k / n; ctx.fillText(fmtKm(S.ringStep * k), cx + Math.cos(a) * r + 4 * DPR, cy + Math.sin(a) * r); }
       ctx.globalAlpha = ga;
