@@ -11,11 +11,11 @@ const Pipe = (() => {
     if (s !== cur) { cur = s; set(s); onStage(s + 1); }
     if (s === 4 && e > 25000 * k) note.textContent = "에이전트가 후보의 병상·수용 제한·이동 시간을 비교하는 중이에요. 보통 30~50초 걸립니다.";
   }
-  function start(demo) { t0 = now(); k = demo ? .4 : 1; cur = -1; note.textContent = "워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다."; clearInterval(timer); tick(); timer = setInterval(tick, 200); }
+  function start(demo) { t0 = now(); k = demo ? .4 : 1; cur = -1; note.textContent = "워크플로가 모은 실시간 데이터로 AI가 순위를 정하고 있습니다."; clearInterval(timer); tick(); timer = setInterval(tick, 200); }
   function finish(ok, msg) {
     clearInterval(timer); timer = 0; const e = now() - t0; elapsed.textContent = "T+" + fmtT(e);
     if (ok) { set(5); note.textContent = msg || "총 " + Math.round(e / 1000) + "초 · 워크플로가 모은 실시간 데이터로 판단했어요."; }
-    else { set(-1); note.textContent = msg || "워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다."; }
+    else { set(-1); note.textContent = msg || "워크플로가 모은 실시간 데이터로 AI가 순위를 정하고 있습니다."; }
   }
   return { start, finish, onStage: f => { onStage = f; } };
 })();
