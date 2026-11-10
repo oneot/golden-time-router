@@ -46,7 +46,7 @@ function normalize(d) {
   const oo = { lat: num(o.lat), lng: num(o.lng) };
   if (oo.lat != null && oo.lng != null) hs.forEach(x => { if (x.km == null && x.lat != null && x.lng != null) x.km = Math.round(distKm(oo, x) * 100) / 100; });
   hs.filter(x => x.st === "rec").sort((a, b) => a.rank - b.rank || (a.min ?? 1e9) - (b.min ?? 1e9)).forEach((x, k) => { if (k < 3) x.rank = k + 1; else { x.rank = 0; x.st = "alt"; } });
-  return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng) }, need: d.need ? String(d.need) : "", hs, partial: !!d.partial };
+  return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng), est: !!o.est }, need: d.need ? String(d.need) : "", hs, partial: !!d.partial };
 }
 // 답변 글(1~3순위·보류·제외)에서 읽을 수 있는 만큼 읽습니다.
 function parseMd(text) {
@@ -137,11 +137,37 @@ function distKm(a, b) {
   const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * D2R) * Math.cos(b.lat * D2R) * Math.sin(dLng / 2) ** 2;
   return 2 * 6371 * Math.asin(Math.sqrt(s));
 }
+// 지도 데이터가 없을 때: 답변 글의 병원 좌표(지도 링크)와 직선거리로 출발지를 추정합니다(삼변측량).
+// 병원이 일직선에 가까우면 선 반대편에도 비슷한 점이 생기므로, 격자로 가장 잘 맞는 점을 찾고 반대편 후보보다 확실히 나을 때만 씁니다.
+function estimateOrigin(list) {
+  const P = list.filter(x => x.lat != null && x.lng != null && x.km > 0);
+  if (P.length < 3) return null;
+  const lat0 = P.reduce((s, x) => s + x.lat, 0) / P.length, lng0 = P.reduce((s, x) => s + x.lng, 0) / P.length;
+  const kx = Math.cos(lat0 * D2R) * 111.32, ky = 110.574;
+  const pts = P.map(x => ({ x: (x.lng - lng0) * kx, y: (x.lat - lat0) * ky, d: x.km }));
+  const err = (x, y) => Math.sqrt(pts.reduce((s, p) => s + (Math.hypot(x - p.x, y - p.y) - p.d) ** 2, 0) / pts.length);
+  const R = Math.max(...pts.map(p => p.d)) + 1, step = Math.max(0.02, R / 150);
+  let bx = 0, by = 0, be = Infinity;
+  for (let x = -R; x <= R; x += step) for (let y = -R; y <= R; y += step) { const e = err(x, y); if (e < be) { be = e; bx = x; by = y; } }
+  for (let it = 0; it < 30; it++) {
+    let J11 = 0, J12 = 0, J22 = 0, g1 = 0, g2 = 0;
+    for (const p of pts) { const dx = bx - p.x, dy = by - p.y, r = Math.hypot(dx, dy) || 1e-6, e = r - p.d, ux = dx / r, uy = dy / r; J11 += ux * ux; J12 += ux * uy; J22 += uy * uy; g1 += ux * e; g2 += uy * e; }
+    const dd = J11 * J22 - J12 * J12; if (dd < 1e-9) break;
+    const sx = (J22 * g1 - J12 * g2) / dd, sy = (J11 * g2 - J12 * g1) / dd; bx -= sx; by -= sy;
+    if (Math.hypot(sx, sy) < 1e-5) break;
+  }
+  be = err(bx, by);
+  let alt = Infinity;
+  for (let x = -R; x <= R; x += step) for (let y = -R; y <= R; y += step) if (Math.hypot(x - bx, y - by) > 0.3) alt = Math.min(alt, err(x, y));
+  if (!(be < 0.15) || alt < Math.max(0.012, be * 3)) return null;
+  return { lat: lat0 + by / ky, lng: lng0 + bx / kx };
+}
 // 데이터 한 줄이 있으면 지도 전체, 없으면 답변 글에서 읽은 요약(partial)을 돌려줍니다.
 function readAnswer(text) {
   const r = extract(text), md = parseMd(r.text), j = r.data;
   let d = j && Array.isArray(j.h) ? fromCompact(j) : j && Array.isArray(j.hospitals) ? j : null;
-  if (d) { d.origin = d.origin || {}; if (md) mergeMd(d, md); d.partial = false; } else d = md;
+  if (d) { d.origin = d.origin || {}; if (md) mergeMd(d, md); d.partial = false; }
+  else if (md) { d = md; const o = estimateOrigin(md.hospitals); if (o) Object.assign(md.origin, o, { est: true }); }
   return { text: r.text, changed: r.changed, data: normalize(d) };
 }
 

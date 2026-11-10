@@ -18,7 +18,7 @@ const Boot = (() => {
 })();
 
 function setHud(state, sub) { $("#hudState").textContent = state; if (sub != null) $("#hudSub").textContent = sub; }
-function setCoord(o) { const c = $("#hudCoord"); c.replaceChildren(h("span", null, "ORIGIN"), h("b", null, o && o.lat != null ? o.lat.toFixed(4) + "° N" : "--.----° N"), h("b", null, o && o.lng != null ? o.lng.toFixed(4) + "° E" : "---.----° E")); }
+function setCoord(o) { const c = $("#hudCoord"), p = o && o.est ? "≈ " : ""; c.replaceChildren(h("span", null, o && o.est ? "ORIGIN · 추정" : "ORIGIN"), h("b", null, o && o.lat != null ? p + o.lat.toFixed(4) + "° N" : "--.----° N"), h("b", null, o && o.lng != null ? p + o.lng.toFixed(4) + "° E" : "---.----° E")); }
 function setMeta(t) { $("#hudMeta").textContent = t; }
 function setLink(state, text) { document.body.classList.toggle("is-connected", state === "on"); document.body.classList.toggle("is-error", state === "err"); $("#linkText").textContent = text; }
 function busy() { return !!(App.turn && !App.turn.paused); }
@@ -117,7 +117,7 @@ function showResult(d) {
   setMeta("NODES " + pad2(d.hs.filter(x => x.lat != null && x.lng != null).length) + " · RANKED " + recs.length + (t && t.demo ? " · SAMPLE" : " · LIVE"));
   setHud("ROUTE LOCKED", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
   const pn = $("#partial"); pn.hidden = !d.partial;
-  if (d.partial) pn.replaceChildren(h("b", null, "요약 모드 · "), document.createTextNode("에이전트 답에 지도 데이터(JSON)가 없어 상위 3곳과 보류·제외만 보여요. 지침에 '웹앱용 데이터' 규칙을 넣고 게시하면 후보 전체와 출발지가 지도에 나타나요."));
+  if (d.partial) pn.replaceChildren(h("b", null, "요약 모드 · "), document.createTextNode("에이전트 답에 지도 데이터(JSON)가 없어 상위 3곳과 보류·제외만 보여요" + (d.origin.est ? "(출발지는 세 병원의 직선거리로 추정)" : "") + ". 지침에 '웹앱용 데이터' 규칙을 넣고 게시하면 후보 10곳이 모두 지도에 나타나요."));
   if (best && !REDUCED) setTimeout(() => {
     const lock = $("#lock"); $("#lockName").textContent = best.name; $("#lockEta").textContent = (best.min != null ? "ETA " + best.min + " MIN" : "") + (best.beds != null ? " · BEDS " + best.beds : "");
     lock.hidden = false; lock.style.animation = "none"; void lock.offsetWidth; lock.style.animation = ""; setTimeout(() => { lock.hidden = true; }, 2900);
