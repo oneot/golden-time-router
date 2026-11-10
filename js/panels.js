@@ -15,7 +15,7 @@ const Pipe = (() => {
   function finish(ok, msg) {
     clearInterval(timer); timer = 0; const e = now() - t0; elapsed.textContent = "T+" + fmtT(e);
     if (ok) { set(5); note.textContent = msg || "총 " + Math.round(e / 1000) + "초 · 워크플로가 모은 실시간 데이터로 판단했어요."; }
-    else { set(-1); note.textContent = msg || "워크플로가 모은 실시간 데이터로 AI가 순위를 정하고 있습니다."; }
+    else { set(-1); note.textContent = msg || "워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다."; }
   }
   return { start, finish, onStage: f => { onStage = f; } };
 })();
