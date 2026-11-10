@@ -163,6 +163,7 @@ body.is-working .composer::before { opacity: 1; }
 @keyframes lock { 0% { opacity: 0; transform: scale(1.15); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.96); } }
 
 .rank { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.notice.partial { margin: 12px 16px 0; }
 .need { margin: 12px 16px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, .35); background: rgba(139, 92, 246, .08); font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
 .need b { color: #fff; }
 .top3 { display: grid; gap: 10px; margin: 12px 16px 0; }
@@ -298,7 +299,7 @@ body.is-working .composer::before { opacity: 1; }
     </div>
     <span class="grow"></span>
     <span class="pill link-pill" id="linkPill"><i></i><span id="linkText">LINK · CONNECTING</span></span>
-    <span class="pill hide-sm"><i></i>CLAUDE OPUS 5.5</span>
+    <span class="pill hide-sm"><i></i>CLAUDE HAIKU 5.5</span>
     <span class="clock hide-sm" id="clock">--:--:--</span>
     <button class="tbtn demo" id="demoBtn" type="button">샘플 시연</button>
     <button class="tbtn" id="newBtn" type="button">새 대화</button>
@@ -324,7 +325,7 @@ body.is-working .composer::before { opacity: 1; }
       <li><i></i><div><b>후보 응급실 10곳</b><span>국립중앙의료원 위치 기반 조회</span></div><em></em></li>
       <li><i></i><div><b>실시간 병상·수용 제한</b><span>가용병상 · 중증질환 수용 · 제한 메시지</span></div><em></em></li>
       <li><i></i><div><b>도로 이동 시간</b><span>카카오모빌리티 실시간 교통</span></div><em></em></li>
-      <li><i></i><div><b>AI 판단</b><span>Claude Opus 5.5 · 순위와 근거</span></div><em></em></li>
+      <li><i></i><div><b>AI 판단</b><span>Claude Haiku 5.5 · 순위와 근거</span></div><em></em></li>
     </ol>
     <p class="pipe-note" id="pipeNote">워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다.</p>
   </section>
@@ -359,6 +360,7 @@ body.is-working .composer::before { opacity: 1; }
 
   <aside class="panel rank" id="rank" aria-label="응급실 순위">
     <div class="ph"><b>04</b>Route Ranking<span class="grow"></span><span class="ph-r" id="rankTime"></span></div>
+    <div class="notice partial" id="partial" hidden></div>
     <div class="need" id="need" hidden></div>
     <div class="top3" id="top3"></div>
     <div class="ph"><b>04-B</b>ETA Comparison<span class="grow"></span></div>
@@ -439,7 +441,41 @@ function normalize(d) {
   });
   if (!hs.length) return null;
   hs.filter(x => x.st === "rec").sort((a, b) => a.rank - b.rank || (a.min ?? 1e9) - (b.min ?? 1e9)).forEach((x, k) => { if (k < 3) x.rank = k + 1; else { x.rank = 0; x.st = "alt"; } });
-  return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng) }, need: d.need ? String(d.need) : "", hs };
+  return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng) }, need: d.need ? String(d.need) : "", hs, partial: !!d.partial };
+}
+// 데이터 블록이 없을 때: 지침의 답변 형식(1~3순위·보류·제외)에서 읽을 수 있는 만큼 읽습니다.
+function parseMd(text) {
+  if (typeof text !== "string" || !/\*\*\s*[1-3]\s*순위/.test(text)) return null;
+  const d = { origin: {}, need: "", hospitals: [], partial: true };
+  let m = text.match(/필요한 치료\s*[:：]\s*([^\n]+)/); if (m) d.need = m[1].replace(/\*+/g, "").trim();
+  m = text.match(/기준 위치\s*[:：]\s*([^\n(]+?)\s*(?:\(([^)\n]+)\))?\s*$/m); if (m) { d.origin.name = m[1].replace(/\*+/g, "").trim(); d.origin.address = (m[2] || "").trim(); }
+  let cur = null, sect = null;
+  const entry = (s, st) => {
+    const t = s.replace(/\*+/g, "").trim(); if (!t) return;
+    const k = t.search(/\s[–—-]\s/), names = (k > 0 ? t.slice(0, k) : t).split(/\s*,\s*/), why = k > 0 ? t.slice(k).replace(/^\s*[–—-]\s*/, "") : "";
+    const mm = why.match(/예상\s*(\d+)\s*분/), bb = why.match(/병상\s*(-?\d+)/);
+    names.filter(n => n && n.length < 40).forEach(n => d.hospitals.push({ rank: 0, status: st, name: n.trim(), min: mm ? +mm[1] : null, beds: bb ? +bb[1] : null, note: why.split(/[·.(]/)[0].trim().slice(0, 30) }));
+  };
+  for (const ln of text.split(/\r?\n/)) {
+    const t = ln.trim(); let x;
+    if ((x = t.match(/^\*\*\s*([1-3])\s*순위\s*[:：]?\s*(.+?)\s*\*\*$/))) { cur = { rank: +x[1], status: "추천", name: x[2].trim() }; d.hospitals.push(cur); sect = null; continue; }
+    if ((x = t.match(/^\*\*(보류|제외)\*\*\s*[:：]?\s*(.*)$/))) { cur = null; sect = x[1]; if (x[2]) entry(x[2], sect); continue; }
+    if (/^[-*•]\s+/.test(t)) {
+      const s = t.replace(/^[-*•]\s+/, "");
+      if (cur) {
+        if ((x = s.match(/예상\s*(\d+(?:\.\d+)?)\s*분/))) cur.min = +x[1];
+        if ((x = s.match(/거리\s*(\d+(?:\.\d+)?)\s*km/))) cur.km = +x[1];
+        if ((x = s.match(/가용\s*병상\s*(-?\d+)/))) cur.beds = +x[1];
+        if ((x = s.match(/(\d{1,2}:\d{2})\s*기준/))) cur.time = x[1];
+        if ((x = s.match(/^근거\s*[:：]\s*(.+)$/))) cur.note = x[1].slice(0, 40);
+        if ((x = s.match(/☎\s*([0-9+][0-9\- ]{6,})/))) cur.tel = x[1].trim();
+        if ((x = s.match(/map\.kakao\.com\/link\/to\/[^)]*?,\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\)/))) { cur.lat = +x[1]; cur.lng = +x[2]; }
+      } else if (sect) entry(s, sect);
+      continue;
+    }
+    if (t) { cur = null; if (!/^\*\*(보류|제외)/.test(t)) sect = null; }
+  }
+  return d.hospitals.some(x => x.rank) ? d : null;
 }
 
 // 지구본 육지 점: Natural Earth 110m 육지를 1.5도 격자(240×120) 비트맵으로 줄인 값
@@ -661,7 +697,7 @@ const Holo = (() => {
 
   function drawData(t) {
     const tt = t - S.revealAt; ctx.lineWidth = DPR;
-    for (const n of S.nodes) { if (n.h.rank) continue; const p = clamp((tt - n.t0) / 420, 0, 1); if (p <= 0) continue; ctx.strokeStyle = rgba(COL[n.h.st], .14 * p); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (n.x - cx) * p, cy + (n.y - cy) * p); ctx.stroke(); }
+    for (const n of S.nodes) { if (n.h.rank || S.approx) continue; const p = clamp((tt - n.t0) / 420, 0, 1); if (p <= 0) continue; ctx.strokeStyle = rgba(COL[n.h.st], .14 * p); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (n.x - cx) * p, cy + (n.y - cy) * p); ctx.stroke(); }
     const nr = S.nearest;
     if (nr && nr.h.rank !== 1) {
       const p = E.out(clamp((tt - S.arcsEnd) / 700, 0, 1));
@@ -676,7 +712,7 @@ const Holo = (() => {
       if (p >= 1) { ctx.globalCompositeOperation = "lighter"; const k = one ? 4 : 2; for (let j = 0; j < k; j++) { const ix = Math.floor(((t * (one ? .00042 : .0003) + j / k) % 1) * cnt); glow(one ? [200, 255, 255] : c, P[ix * 2], P[ix * 2 + 1], (one ? 10 : 7) * DPR, .95); } ctx.globalCompositeOperation = "source-over"; }
     }
     for (const n of S.nodes) drawNode(n, t, tt);
-    drawOrigin(t, tt);
+    if (!S.approx) drawOrigin(t, tt);
     drawLabels(tt);
   }
   function bracket(x, y, r, rot, c) { ctx.strokeStyle = rgba(c, .85); ctx.lineWidth = 1.6 * DPR; for (let k = 0; k < 4; k++) { const a = rot + k * Math.PI / 2; ctx.beginPath(); ctx.arc(x, y, r, a, a + .7); ctx.stroke(); } }
@@ -729,8 +765,8 @@ const Holo = (() => {
     S.nodes = []; S.ranked = []; S.nearest = null; S.originLab = null; S.nearestLab = null;
     const d = S.data; if (!d) return;
     const R = Rh * .86, o = d.origin, pts = d.hs.filter(x => x.lat != null && x.lng != null);
-    let lat0 = o.lat, lng0 = o.lng;
-    if (lat0 == null || lng0 == null) { if (!pts.length) return; lat0 = pts.reduce((s, x) => s + x.lat, 0) / pts.length; lng0 = pts.reduce((s, x) => s + x.lng, 0) / pts.length; }
+    let lat0 = o.lat, lng0 = o.lng; S.approx = lat0 == null || lng0 == null;
+    if (S.approx) { if (!pts.length) return; lat0 = pts.reduce((s, x) => s + x.lat, 0) / pts.length; lng0 = pts.reduce((s, x) => s + x.lng, 0) / pts.length; }
     const kx = Math.cos(lat0 * D2R) * 111.32, ky = 110.574; let maxKm = .3;
     const P = pts.map(x => { const dx = (x.lng - lng0) * kx, dy = (x.lat - lat0) * ky, dist = Math.hypot(dx, dy); maxKm = Math.max(maxKm, dist); return { h: x, dx, dy, dist }; });
     S.ringStep = niceStep(maxKm * 1.06); S.ringN = Math.max(1, Math.ceil(maxKm * 1.06 / S.ringStep)); const sc = R / (S.ringN * S.ringStep);
@@ -738,9 +774,10 @@ const Holo = (() => {
     S.nodes = P.map((p, k) => ({ h: p.h, x: cx + p.dx * sc, y: cy - p.dy * sc, t0: 300 + k * 110, dist: p.dist }));
     S.ranked = S.nodes.filter(n => n.h.rank).sort((a, b) => a.h.rank - b.h.rank);
     const base = 300 + S.nodes.length * 110 + 150;
+    if (S.approx) S.ranked = [];
     S.ranked.forEach((n, k) => { n.a0 = base + k * 380; n.curve = curve(cx, cy, n.x, n.y, k % 2 ? -.17 : .17); });
     S.arcsEnd = base + S.ranked.length * 380 + 350;
-    S.nearest = S.nodes.filter(n => n.h.st !== "out").sort((a, b) => (a.h.km ?? a.dist) - (b.h.km ?? b.dist))[0] || null;
+    S.nearest = S.approx ? null : S.nodes.filter(n => n.h.st !== "out").sort((a, b) => (a.h.km ?? a.dist) - (b.h.km ?? b.dist))[0] || null;
     placeLabels();
   }
   function placeLabels() {
@@ -753,7 +790,7 @@ const Holo = (() => {
     const ot = d.origin.name.length > 18 ? d.origin.name.slice(0, 17) + "…" : d.origin.name, tx = 50 * DPR, ow = tx + ctx.measureText(ot).width + 10 * DPR, oh = 24 * DPR;
     const OL = { x: cx - ow / 2, y: cy - 44 * DPR - oh, w: ow, h: oh, txt: ot, tx };
     if (S.nodes.some(n => Math.abs(n.x - cx) < ow / 2 + 8 * DPR && n.y > OL.y - 8 * DPR && n.y < OL.y + oh + 8 * DPR)) OL.y = cy + 40 * DPR;
-    S.originLab = OL; placed.push(OL);
+    if (!S.approx) { S.originLab = OL; placed.push(OL); }
     const nr = S.nearest;
     if (nr && nr.h.rank !== 1) {
       ctx.font = "700 " + 10 * DPR + "px " + FONT;
@@ -880,7 +917,7 @@ const Ticker = (() => {
     el.style.setProperty("--dur", Math.max(28, len * .3) + "s");
   }
   return {
-    idle: () => fill([["STANDBY", "장소와 환자 상황을 보내면 주변 응급실 10곳을 분석합니다"], ["DATA", "국립중앙의료원 응급의료정보 · 카카오 로컬 · 카카오모빌리티 길찾기"], ["AGENT", "Copilot Studio 에이전트 · Claude Opus 5.5"], ["LINK", "agent-seal 봉인 · Direct Line · GitHub Pages"]]),
+    idle: () => fill([["STANDBY", "장소와 환자 상황을 보내면 주변 응급실 10곳을 분석합니다"], ["DATA", "국립중앙의료원 응급의료정보 · 카카오 로컬 · 카카오모빌리티 길찾기"], ["AGENT", "Copilot Studio 에이전트 · Claude Haiku 5.5"], ["LINK", "agent-seal 봉인 · Direct Line · GitHub Pages"]]),
     scan: t => fill([["REQUEST", t], ["FLOW", "장소 좌표 → 후보 응급실 10곳 → 실시간 병상·수용 제한 → 도로 이동 시간 → AI 판단"], ["NOTE", "판단까지 보통 30~60초 걸립니다"]]),
     result: d => fill(d.hs.slice().sort((a, b) => (a.min ?? 999) - (b.min ?? 999)).map(x => [x.short, [x.min != null ? x.min + "분" : null, x.beds != null ? "병상 " + x.beds : null, x.time ? x.time + " 갱신" : null, ST_TXT[x.st]].filter(Boolean).join(" · ")]))
   };
@@ -967,7 +1004,7 @@ const Rank = (() => {
 
 const DEMO = { data: {"origin":{"name":"보라매공원","address":"서울 동작구 신대방동 722","lat":37.493280643072396,"lng":126.92051428564939},"need":"일반 응급(MKioskTy28) – 다리 골절, 해당 중증질환 항목 없음","hospitals":[{"rank":1,"status":"추천","name":"한림대학교 강남성심병원","lat":37.493243842312545,"lng":126.90866355867689,"km":1.05,"road":1.4,"min":4,"beds":8,"time":"20:41","tel":"02-829-5114","note":"제한 없음, 가장 빠름"},{"rank":2,"status":"추천","name":"대림성모병원","lat":37.49068901587815,"lng":126.90716283591561,"km":1.21,"road":1.7,"min":6,"beds":7,"time":"20:40","tel":"02-829-9000","note":"제한 없음, 두 번째로 빠름"},{"rank":3,"status":"추천","name":"성애의료재단성애병원","lat":37.512048270393805,"lng":126.92235924751729,"km":2.09,"road":2.3,"min":9,"beds":13,"time":"20:43","tel":"02-840-7114","note":"제한 없음, 세 번째로 빠름"},{"rank":0,"status":"대안","name":"명지성모병원","lat":37.49385027179074,"lng":126.89924603567025,"km":1.88,"road":2.5,"min":9,"beds":6,"time":"20:45","tel":"02-1899-1475","note":"조건 충족, 549초로 4위"},{"rank":0,"status":"대안","name":"서울특별시보라매병원","lat":37.49371834838055,"lng":126.92404755555235,"km":0.32,"road":2.6,"min":9,"beds":18,"time":"20:45","tel":"02-870-2114","note":"최근접·병상 최다, 560초"},{"rank":0,"status":"대안","name":"가톨릭대학교 여의도성모병원","lat":37.51826955419788,"lng":126.93672682810558,"km":3.13,"road":3.8,"min":13,"beds":11,"time":"20:45","tel":"1661-7575","note":"조건 충족, 13분"},{"rank":0,"status":"대안","name":"씨엠병원","lat":37.51884139054663,"lng":126.90367542781709,"km":3.21,"road":4.1,"min":15,"beds":8,"time":"20:45","tel":"02-2678-0001","note":"조건 충족, 15분"},{"rank":0,"status":"대안","name":"고려대학교의과대학부속구로병원","lat":37.492110358092134,"lng":126.88474046023177,"km":3.16,"road":4.5,"min":17,"beds":1,"time":"20:43","tel":"02-2626-1114","note":"가장 멂, 병상 1"},{"rank":0,"status":"보류","name":"의료법인서울효천의료재단 에이치플러스양지병원","lat":37.4842711870398,"lng":126.93252770303516,"km":1.46,"road":3.2,"min":11,"beds":8,"time":"20:45","tel":"02-1877-8875","note":"응급실 불가 메시지 11/8~11/14"},{"rank":0,"status":"제외","name":"강남힐병원","lat":37.4816478504812,"lng":126.91164761293011,"km":1.51,"road":2.4,"min":9,"beds":null,"time":null,"tel":null,"note":"수용·병상 정보 없음"}]}, md: "**🚑 이송 추천** · 필요한 치료: 일반 응급(MKioskTy28 응급실). 다리 골절에 해당하는 중증질환 항목이 없어 일반 응급으로 판단했습니다. 쇼크, 개방성 골절, 다발성 외상이 있으면 중증외상이므로 권역외상센터로 이송해야 합니다.\n📍 기준 위치: 보라매공원 (서울 동작구 신대방동 722)\n\n**1순위 한림대학교 강남성심병원**\n- 예상 4분(실시간 교통) · 거리 1.05km · 응급실 가용병상 8(20:41 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 가장 짧습니다.\n- ☎ 02-829-5114 · [지도](https://map.kakao.com/link/to/한림대학교 강남성심병원,37.493243842312545,126.90866355867689)\n\n**2순위 대림성모병원**\n- 예상 6분(실시간 교통) · 거리 1.21km · 응급실 가용병상 7(20:40 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 두 번째로 짧습니다.\n- ☎ 02-829-9000 · [지도](https://map.kakao.com/link/to/대림성모병원,37.49068901587815,126.90716283591561)\n\n**3순위 성애의료재단성애병원**\n- 예상 9분(실시간 교통) · 거리 2.09km · 응급실 가용병상 13(20:43 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 세 번째로 짧습니다(523초).\n- ☎ 02-840-7114 · [지도](https://map.kakao.com/link/to/성애의료재단성애병원,37.512048270393805,126.92235924751729)\n\nℹ️ 직선거리로는 서울특별시보라매병원(0.32km)이 가장 가깝지만, 도로로는 2.6km에 9분(560초)이 걸려 소요시간 순위는 5위입니다. 가용병상이 18로 가장 많아 1순위 대안입니다. 그다음 대안은 명지성모병원 9분(549초), 가톨릭대학교 여의도성모병원 13분, 씨엠병원 15분, 고려대학교의과대학부속구로병원 17분(병상 1) 순입니다.\n\n**보류** 에이치플러스양지병원 – 응급실 수용 제한 메시지 '불가능메세지등록'(기타 진료과, 2026-11-08 00:00~2026-11-14 23:59) · 예상 11분. 전화로 수용이 확인돼도 상위 3곳보다 늦어 대안으로만 쓸 수 있습니다.\n**제외** 강남힐병원 – 중증질환 수용 정보와 실시간 병상 목록에 없음\n⚠️ 병상과 메시지는 병원이 입력한 값이라 실제와 다를 수 있습니다. 출발 전 전화로 수용을 확인하세요.\n_연구용 시뮬레이션 – 실제 이송 판단에 쓰지 않습니다._\n\n```json\n{\"origin\":{\"name\":\"보라매공원\",\"address\":\"서울 동작구 신대방동 722\",\"lat\":37.493280643072396,\"lng\":126.92051428564939},\"need\":\"일반 응급(MKioskTy28) – 다리 골절, 해당 중증질환 항목 없음\",\"hospitals\":[\n{\"rank\":1,\"status\":\"추천\",\"name\":\"한림대학교 강남성심병원\",\"lat\":37.493243842312545,\"lng\":126.90866355867689,\"km\":1.05,\"road\":1.4,\"min\":4,\"beds\":8,\"time\":\"20:41\",\"tel\":\"02-829-5114\",\"note\":\"제한 없음, 가장 빠름\"},\n{\"rank\":2,\"status\":\"추천\",\"name\":\"대림성모병원\",\"lat\":37.49068901587815,\"lng\":126.90716283591561,\"km\":1.21,\"road\":1.7,\"min\":6,\"beds\":7,\"time\":\"20:40\",\"tel\":\"02-829-9000\",\"note\":\"제한 없음, 두 번째로 빠름\"},\n{\"rank\":3,\"status\":\"추천\",\"name\":\"성애의료재단성애병원\",\"lat\":37.512048270393805,\"lng\":126.92235924751729,\"km\":2.09,\"road\":2.3,\"min\":9,\"beds\":13,\"time\":\"20:43\",\"tel\":\"02-840-7114\",\"note\":\"제한 없음, 세 번째로 빠름\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"명지성모병원\",\"lat\":37.49385027179074,\"lng\":126.89924603567025,\"km\":1.88,\"road\":2.5,\"min\":9,\"beds\":6,\"time\":\"20:45\",\"tel\":\"02-1899-1475\",\"note\":\"조건 충족, 549초로 4위\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"서울특별시보라매병원\",\"lat\":37.49371834838055,\"lng\":126.92404755555235,\"km\":0.32,\"road\":2.6,\"min\":9,\"beds\":18,\"time\":\"20:45\",\"tel\":\"02-870-2114\",\"note\":\"최근접·병상 최다, 560초\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"가톨릭대학교 여의도성모병원\",\"lat\":37.51826955419788,\"lng\":126.93672682810558,\"km\":3.13,\"road\":3.8,\"min\":13,\"beds\":11,\"time\":\"20:45\",\"tel\":\"1661-7575\",\"note\":\"조건 충족, 13분\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"씨엠병원\",\"lat\":37.51884139054663,\"lng\":126.90367542781709,\"km\":3.21,\"road\":4.1,\"min\":15,\"beds\":8,\"time\":\"20:45\",\"tel\":\"02-2678-0001\",\"note\":\"조건 충족, 15분\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"고려대학교의과대학부속구로병원\",\"lat\":37.492110358092134,\"lng\":126.88474046023177,\"km\":3.16,\"road\":4.5,\"min\":17,\"beds\":1,\"time\":\"20:43\",\"tel\":\"02-2626-1114\",\"note\":\"가장 멂, 병상 1\"},\n{\"rank\":0,\"status\":\"보류\",\"name\":\"의료법인서울효천의료재단 에이치플러스양지병원\",\"lat\":37.4842711870398,\"lng\":126.93252770303516,\"km\":1.46,\"road\":3.2,\"min\":11,\"beds\":8,\"time\":\"20:45\",\"tel\":\"02-1877-8875\",\"note\":\"응급실 불가 메시지 11/8~11/14\"},\n{\"rank\":0,\"status\":\"제외\",\"name\":\"강남힐병원\",\"lat\":37.4816478504812,\"lng\":126.91164761293011,\"km\":1.51,\"road\":2.4,\"min\":9,\"beds\":null,\"time\":null,\"tel\":null,\"note\":\"수용·병상 정보 없음\"}\n]}\n```", text: "보라매공원, 50대 다리골절 노인", at: "2026-11-10 20:45 실데이터 기록" };
 const EXAMPLES = ["보라매공원, 50대 다리골절 노인", "강남역, 60대 남성 갑작스러운 가슴 통증", "잠실 롯데월드, 7살 아이 열성 경련", "광화문광장, 70대 여성 한쪽 팔다리 마비"];
-const STAGE_HUD = [null, ["LOCATING", "카카오 장소 검색으로 좌표를 찾는 중"], ["SCANNING ER", "주변 응급실 후보 10곳을 찾는 중"], ["LIVE BEDS", "가용병상·중증질환 수용·제한 메시지 확인 중"], ["ROUTING", "실시간 교통으로 도로 이동 시간 계산 중"], ["AI DECISION", "Claude Opus 5.5가 순위를 판단하는 중"]];
+const STAGE_HUD = [null, ["LOCATING", "카카오 장소 검색으로 좌표를 찾는 중"], ["SCANNING ER", "주변 응급실 후보 10곳을 찾는 중"], ["LIVE BEDS", "가용병상·중증질환 수용·제한 메시지 확인 중"], ["ROUTING", "실시간 교통으로 도로 이동 시간 계산 중"], ["AI DECISION", "Claude Haiku 5.5가 순위를 판단하는 중"]];
 const App = { store: null, connected: false, turn: null, data: null, demo: false, timer: 0 };
 const q = $("#q"), sendBtn = $("#send"), chipsEl = $("#chips"), noticeEl = $("#notice");
 
@@ -1018,7 +1055,7 @@ function submit(text) {
 function beginTurn(text, demo) {
   App.turn = { text, demo, paused: false }; App.data = null;
   document.body.classList.add("is-working"); document.body.classList.remove("is-result");
-  FX.boost(true); Holo.locate(); Pipe.start(demo); Rank.scanning(); Ticker.scan(text); setCoord(null);
+  FX.boost(true); Holo.locate(); Pipe.start(demo); Rank.scanning(); Ticker.scan(text); setCoord(null); $("#partial").hidden = true; clearTimeout(App.pt);
   setMeta("NODES 00 · " + (demo ? "SAMPLE" : "LIVE") + " SCAN");
   clearTimeout(App.timer); if (!demo) App.timer = setTimeout(() => endTurn(), 180000);
   refresh(); if (MOBILE()) scrollToEl($("#holoPanel"));
@@ -1053,6 +1090,8 @@ function showResult(d) {
   const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), best = recs[0];
   setMeta("NODES " + pad2(d.hs.filter(x => x.lat != null && x.lng != null).length) + " · RANKED " + recs.length + (t && t.demo ? " · SAMPLE" : " · LIVE"));
   setHud("ROUTE LOCKED", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
+  const pn = $("#partial"); pn.hidden = !d.partial;
+  if (d.partial) pn.replaceChildren(h("b", null, "답변 글에서 읽은 요약이에요. "), document.createTextNode("에이전트 답에 웹앱용 데이터(JSON)가 없어 1~3순위와 보류·제외만 표시했어요. 지침에 '웹앱용 데이터' 규칙을 넣고 게시하면 후보 전체와 출발지가 지도에 나타나요."));
   if (best && !REDUCED) setTimeout(() => {
     const lock = $("#lock"); $("#lockName").textContent = best.name; $("#lockEta").textContent = (best.min != null ? "ETA " + best.min + " MIN" : "") + (best.beds != null ? " · BEDS " + best.beds : "");
     lock.hidden = false; lock.style.animation = "none"; void lock.offsetWidth; lock.style.animation = ""; setTimeout(() => { lock.hidden = true; }, 2900);
@@ -1096,12 +1135,14 @@ App.onStage = s => { Holo.setStage(s); const x = STAGE_HUD[s]; if (x && busy()) 
 App.onConnected = () => { if (App.connected) return; App.connected = true; setLink("on", "LINK · ONLINE"); Boot.ok(); if (!App.demo) noticeEl.hidden = true; refresh(); say("에이전트와 연결됐어요"); };
 App.onConnectError = e => { App.connected = false; const m = (e && e.message) || String(e || "unknown"); setLink("err", "LINK · OFFLINE"); Boot.fail(m.slice(0, 60)); showOffline(m); refresh(); };
 App.onBot = (a, r) => {
+  if (a.type === "event") { if (a.name === "turn.complete" && App.turn && App.turn.got && !App.turn.paused) { clearTimeout(App.pt); setTimeout(pauseTurn, 0); } return; }
   if (a.type === "typing") { if (App.turn && App.turn.paused && !App.turn.demo) resumeTurn(); return; }
   renderSuggested(a.suggestedActions && a.suggestedActions.actions);
   if (!App.turn || App.turn.demo) return;
-  if (r.data) { const d = normalize(r.data); if (d) { setTimeout(() => showResult(d), 0); return; } }
+  const d = normalize(r.data) || normalize(parseMd(r.text));
+  if (d) { clearTimeout(App.pt); setTimeout(() => showResult(d), 0); return; }
   if (!String(r.text || "").trim() && !(a.attachments || []).length) return;
-  setTimeout(pauseTurn, 0);
+  App.turn.got = true; clearTimeout(App.pt); App.pt = setTimeout(pauseTurn, 4000);
 };
 // 에이전트 활동을 Web Chat에 그리기 전에 데이터 블록을 떼어 대시보드로 보냅니다.
 function makeStore() {
@@ -1110,7 +1151,8 @@ function makeStore() {
       if (action.type === "DIRECT_LINE/CONNECT_FULFILLED") App.onConnected();
       else if (action.type === "DIRECT_LINE/INCOMING_ACTIVITY") {
         const a = action.payload && action.payload.activity;
-        if (a && a.from && a.from.role !== "user" && (a.type === "message" || a.type === "typing")) {
+        if (a && a.from && a.from.role !== "user" && a.type === "event") App.onBot(a, {});
+        else if (a && a.from && a.from.role !== "user" && (a.type === "message" || a.type === "typing")) {
           const r = extract(a.text);
           if (r.changed) action = Object.assign({}, action, { payload: Object.assign({}, action.payload, { activity: Object.assign({}, a, { text: r.text }) }) });
           App.onBot(a, r);
@@ -1138,7 +1180,7 @@ if (/[?&]demo/.test(location.search)) setTimeout(runDemo, 700);
 
 // ── agent-seal 연결 코드: BROKER_URL·SEALED 두 줄과 연결 흐름은 바꾸지 마세요 ──
   const BROKER_URL = "https://dl-broker-juwon-4jt3z.azurewebsites.net/api/directlineToken";
-  const SEALED = "__SEALED__";
+  const SEALED = "ifbJyQTYEIkzN6C0My-OS-LrkMfkOdZi2QvbmbrlTLmL6V-KuQlWlAlOwP2jiiLy_QKx_eDO7xm2Va4JPUWAdU3zxnsguwlJ9k_Por5j4ikpBWeTECLdqZzF4NuU38CPgnM0TitSoho3pGAlhA2vsfZMQRpQxQtPyL0KTsHVRDrO9WmnoohfA43ChQUSKiZdZ13U56SjBeGHCBnP36aMMzFhZtAP1JNT6GRhFsMt_NMIMcGcN12bf-01NWLdBjZZ60sBRaPFikhq0caGJNaaqdCqjZfwITCgCBp320jss0p03DRqy8-I-4prgTXXc_cWKbQbkxN9Ai7GzgGnx0FiXTcoogKeLu3kDwv3G9FdmGYqXoyw-V5aQ0uN9GBFCYam2Zyg7LEbqsEUiuDtIHb0uL8e1930Yff_KG0zY5whzD8wcdTvEe_3KvbPvjyJDn-59js7xvyNrHGXmPEU-Evf20FrsfvWii1_XKWGa-zQx41zsyd8Foo3yafvFG_9YBSrenITGdoj0be9J1Fb3eMTkZ8iFxrCJaJH6lzGh7h9kgk1wXLey6sTaGKr-kDNJTpsLwEolnwiNUAxqoQPFPZosFbmmdptt4E9EA1UT00vkTeo2luNVBDuEUJsbF_cwRgVnY7KJLvZ22Oa270";
 
   fetch(BROKER_URL, { method: "POST", body: JSON.stringify({ sealed: SEALED }) })
     .then(r => r.json())
