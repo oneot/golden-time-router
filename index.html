@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>골든타임 라우터 · Golden Time Router</title>
+<meta name="description" content="장소와 환자 상황을 말하면 주변 응급실의 실시간 병상과 도로 이동 시간으로 상위 3곳을 추천하는 Copilot Studio 에이전트 대시보드">
+<meta name="theme-color" content="#03040b">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap">
+<script src="https://cdn.botframework.com/botframework-webchat/4.18.0/webchat.js"></script>
+<style>
+:root { --bg: #03040b; --ink: #e8edff; --ink-2: #c4cbe8; --muted: #8d96bd; --dim: #5d6594; --line: rgba(130, 150, 255, .15); --line-2: rgba(130, 150, 255, .3); --cyan: #22d3ee; --cyan-2: #8ff3ff; --violet: #8b5cf6; --violet-2: #b4a3ff; --magenta: #f472b6; --amber: #fbbf24; --rose: #fb7185; --mint: #34d399; --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif; --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace; --display: 'Space Grotesk', 'Pretendard Variable', Pretendard, sans-serif; --r: 18px; --gap: 14px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; scrollbar-color: rgba(130, 150, 255, .3) transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+body { min-height: 100svh; overflow-x: hidden; word-break: keep-all; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -2; background: radial-gradient(1100px 720px at 6% -14%, rgba(124, 58, 237, .30), transparent 62%), radial-gradient(900px 700px at 106% 112%, rgba(34, 211, 238, .17), transparent 60%), radial-gradient(760px 520px at 52% 46%, rgba(59, 130, 246, .07), transparent 70%), linear-gradient(180deg, #050617, #03040b 60%); }
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
+.fx-scan { position: fixed; inset: 0; z-index: 80; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px); }
+.fx-vig { position: fixed; inset: 0; z-index: 79; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, transparent 58%, rgba(0, 0, 0, .5)); }
+button, textarea { font: inherit; color: inherit; }
+a { color: var(--cyan-2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(130, 150, 255, .25); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.app { display: grid; gap: var(--gap); padding: 12px clamp(12px, 1.4vw, 20px); height: 100svh; min-height: 680px; grid-template-columns: minmax(300px, 350px) minmax(0, 1fr) minmax(330px, 400px); grid-template-rows: auto auto auto minmax(0, 1fr) auto; grid-template-areas: "top top top" "mission holo rank" "pipe holo rank" "brief holo rank" "foot foot foot"; }
+.top { grid-area: top; }
+.mission { grid-area: mission; }
+.pipe { grid-area: pipe; }
+.brief { grid-area: brief; }
+.holo { grid-area: holo; }
+.rank { grid-area: rank; }
+.foot { grid-area: foot; }
+
+.panel { position: relative; min-width: 0; border-radius: var(--r); border: 1px solid var(--line); background: linear-gradient(180deg, rgba(16, 21, 50, .72), rgba(7, 10, 26, .64)); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); box-shadow: 0 24px 60px -32px rgba(0, 0, 0, .9), inset 0 1px 0 rgba(255, 255, 255, .05); }
+.panel::before, .panel::after { content: ""; position: absolute; z-index: 5; width: 16px; height: 16px; pointer-events: none; border: 1.5px solid var(--cyan); opacity: .75; }
+.panel::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; border-top-left-radius: var(--r); }
+.panel::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; border-bottom-right-radius: var(--r); }
+.ph { display: flex; align-items: center; gap: 10px; padding: 13px 16px 0; font: 500 10.5px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--cyan-2); white-space: nowrap; }
+.ph b { font-weight: 500; color: var(--dim); }
+.ph .grow { flex: 1; min-width: 12px; height: 1px; background: linear-gradient(90deg, var(--line-2), transparent); }
+.ph .ph-r { color: var(--muted); letter-spacing: .12em; }
+
+.top { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 2px 4px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { flex: none; width: 42px; height: 42px; }
+.logo .r1 { transform-origin: 21px 21px; animation: spin 9s linear infinite; }
+.logo .r2 { transform-origin: 21px 21px; animation: spin 14s linear infinite reverse; }
+.brand h1 { margin: 0; font: 700 15px/1 var(--display); letter-spacing: .28em; white-space: nowrap; background: linear-gradient(90deg, #fff, var(--cyan-2) 45%, var(--violet-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand p { margin: 6px 0 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .grow { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(10, 14, 34, .6); font: 500 10.5px/1 var(--mono); letter-spacing: .1em; color: var(--ink-2); white-space: nowrap; }
+.pill i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--violet); box-shadow: 0 0 10px var(--violet); }
+.link-pill i { background: var(--amber); box-shadow: 0 0 10px var(--amber); animation: blink 1s steps(2) infinite; }
+body.is-connected .link-pill i { background: var(--mint); box-shadow: 0 0 12px var(--mint); animation: pulse 2.4s ease-in-out infinite; }
+body.is-error .link-pill i { background: var(--rose); box-shadow: 0 0 10px var(--rose); animation: none; }
+.clock { font: 500 12px/1 var(--mono); letter-spacing: .14em; color: var(--cyan-2); white-space: nowrap; }
+.tbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-2); background: rgba(14, 18, 44, .7); color: var(--ink); font: 600 12.5px/1 var(--font); cursor: pointer; white-space: nowrap; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.tbtn:hover { border-color: var(--cyan); box-shadow: 0 0 22px -6px var(--cyan); }
+.tbtn:active { transform: translateY(1px); }
+.tbtn.demo { border-color: rgba(251, 191, 36, .45); color: #ffe7a8; }
+.tbtn.demo:hover { border-color: var(--amber); box-shadow: 0 0 22px -6px var(--amber); }
+
+.m-title { margin: 14px 16px 0; font: 800 21px/1.3 var(--font); letter-spacing: -.02em; }
+.m-title em { font-style: normal; background: linear-gradient(90deg, var(--cyan-2), var(--violet-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.m-sub { margin: 8px 16px 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.composer { position: relative; display: flex; align-items: flex-end; gap: 8px; margin: 14px 16px 0; padding: 9px 9px 9px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(3, 6, 20, .62); transition: border-color .2s, box-shadow .2s; }
+.composer:focus-within { border-color: rgba(34, 211, 238, .65); box-shadow: 0 0 0 3px rgba(34, 211, 238, .12), 0 0 34px -8px rgba(34, 211, 238, .5); }
+.composer textarea { flex: 1; min-width: 0; min-height: 26px; max-height: 132px; padding: 5px 0; border: 0; outline: 0; resize: none; background: transparent; font: 500 15px/1.55 var(--font); color: var(--ink); }
+.composer textarea::placeholder { color: var(--dim); }
+.send { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 12px; background: linear-gradient(135deg, var(--cyan), var(--violet)); color: #050617; cursor: pointer; box-shadow: 0 8px 24px -10px var(--cyan); transition: opacity .2s, transform .2s; }
+.send svg { width: 18px; height: 18px; }
+.send:disabled { opacity: .3; cursor: default; box-shadow: none; }
+.send:not(:disabled):hover { transform: translateY(-1px); }
+@property --glow { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.composer::before { content: ""; position: absolute; inset: -1px; padding: 1.5px; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .6s; background: conic-gradient(from var(--glow), var(--cyan), var(--violet), var(--magenta), var(--cyan)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: glow-spin 3s linear infinite; }
+body.is-working .composer::before { opacity: 1; }
+@keyframes glow-spin { to { --glow: 360deg; } }
+.hint { margin: 8px 16px 0; font-size: 11.5px; color: var(--dim); }
+.hint kbd { padding: 1px 5px; border-radius: 5px; border: 1px solid var(--line-2); font: 500 10px/1.4 var(--mono); color: var(--muted); }
+.chips { display: flex; flex-wrap: nowrap; gap: 6px; margin: 10px 0 16px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; -webkit-mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 28px), transparent); mask: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 28px), transparent); }
+.chips::-webkit-scrollbar { display: none; }
+.chip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(20, 26, 60, .5); color: var(--ink-2); font: 500 12px/1 var(--font); cursor: pointer; white-space: nowrap; transition: border-color .2s, background .2s, color .2s; }
+.chip:hover:not(:disabled) { border-color: var(--cyan); color: #fff; background: rgba(34, 211, 238, .1); }
+.chip:disabled { opacity: .4; cursor: default; }
+.chip.sa { border-color: rgba(139, 92, 246, .55); color: #e3dcff; }
+.notice { margin: 0 16px 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(251, 191, 36, .3); background: rgba(251, 191, 36, .06); font-size: 12.5px; line-height: 1.6; color: #f5e6c4; }
+.notice b { color: #ffe7a8; }
+.notice code { display: block; margin-top: 6px; font: 11px/1.5 var(--mono); color: var(--muted); word-break: break-all; }
+.notice .row { display: flex; gap: 8px; margin-top: 10px; }
+
+.stages { list-style: none; margin: 12px 0 0; padding: 0 16px; display: grid; gap: 2px; }
+.stages li { position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 6px 0; }
+.stages li:not(:last-child)::after { content: ""; position: absolute; left: 10px; top: 30px; bottom: -7px; width: 1px; background: var(--line-2); }
+.stages i { position: relative; width: 21px; height: 21px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(6, 9, 26, .8); }
+.stages i::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--dim); }
+.stages b { display: block; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.stages span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stages em { font: 500 10.5px/1 var(--mono); font-style: normal; letter-spacing: .06em; color: var(--dim); white-space: nowrap; }
+.stages li.on i { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(34, 211, 238, .12), 0 0 18px rgba(34, 211, 238, .6); }
+.stages li.on i::after { background: var(--cyan); animation: pulse 1s ease-in-out infinite; }
+.stages li.on b { color: #fff; }
+.stages li.on em { color: var(--cyan-2); }
+.stages li.done i { border-color: rgba(52, 211, 153, .6); }
+.stages li.done i::after { inset: 5px; border-radius: 1px; background: var(--mint); clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 8%, 38% 72%); }
+.stages li.done em { color: var(--mint); }
+.pipe-note { margin: 6px 16px 14px; font-size: 11px; line-height: 1.5; color: var(--dim); }
+
+.brief { display: flex; flex-direction: column; min-height: 0; }
+.brief-body { position: relative; flex: 1; min-height: 0; margin: 6px 4px 6px; }
+#webchat { height: 100%; }
+#webchat .webchat__typing-indicator { display: none !important; }
+#webchat .webchat__stacked-layout:not(.webchat__stacked-layout--from-user) .webchat__stacked-layout__status { display: none; }
+#webchat .webchat__render-markdown { word-break: keep-all; overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.72; }
+#webchat .webchat__render-markdown p { margin: 0 0 8px; }
+#webchat .webchat__render-markdown ul, #webchat .webchat__render-markdown ol { margin: 2px 0 10px; padding-left: 18px; }
+#webchat .webchat__render-markdown li { margin: 2px 0; }
+#webchat .webchat__render-markdown strong { color: #fff; }
+#webchat .webchat__render-markdown em { color: var(--muted); }
+#webchat .webchat__render-markdown a { color: var(--cyan-2); }
+#webchat .webchat__render-markdown code { padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, .07); font: 12px var(--mono); }
+#webchat .webchat__render-markdown table { display: block; max-width: 100%; overflow-x: auto; margin: 10px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#webchat .webchat__render-markdown th, #webchat .webchat__render-markdown td { padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#webchat .webchat__scroll-to-end-button { background: var(--cyan); color: #03040b; border-radius: 999px; }
+.demo-brief { height: 100%; overflow: auto; padding: 8px 12px 12px; font-size: 13.5px; line-height: 1.72; color: #dfe6ff; }
+.demo-brief .ubub { width: fit-content; max-width: 85%; margin: 4px 0 12px auto; padding: 9px 13px; border-radius: 12px; border: 1px solid rgba(34, 211, 238, .38); background: rgba(34, 211, 238, .12); color: #ecfeff; }
+.demo-brief .md p { margin: 0 0 8px; }
+.demo-brief .md ul { margin: 2px 0 10px; padding-left: 18px; }
+.demo-brief .md strong { color: #fff; }
+.demo-brief .md em { color: var(--muted); }
+.demo-brief .md a { color: var(--cyan-2); }
+.demo-tag { margin: 10px 0 0; font: 500 10.5px/1.5 var(--mono); letter-spacing: .06em; color: var(--amber); }
+.demo-wait { color: var(--muted); }
+
+.holo { overflow: hidden; min-height: 420px; }
+#holo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: manipulation; }
+.hud { position: absolute; z-index: 2; pointer-events: none; }
+.hud-tl { top: 0; left: 0; }
+.hud-state { margin: 10px 16px 0; font: 700 22px/1 var(--display); letter-spacing: .14em; color: #fff; text-shadow: 0 0 18px rgba(34, 211, 238, .55); white-space: nowrap; }
+.hud-sub { max-width: min(440px, 58vw); margin: 7px 16px 0; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.hud-tr { top: 14px; right: 16px; text-align: right; font: 500 10.5px/1.75 var(--mono); letter-spacing: .12em; color: var(--muted); }
+.hud-tr b { display: block; font-weight: 500; color: var(--cyan-2); }
+.hud-bl { left: 16px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: 64%; }
+.lg { display: inline-flex; align-items: center; gap: 6px; font: 500 10.5px/1 var(--mono); letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+.lg i { width: 8px; height: 8px; border-radius: 50%; }
+.hud-br { right: 16px; bottom: 14px; text-align: right; font: 500 10.5px/1.75 var(--mono); letter-spacing: .12em; color: var(--muted); }
+.tip { position: absolute; z-index: 4; width: max-content; max-width: 270px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(34, 211, 238, .45); background: rgba(4, 7, 22, .93); box-shadow: 0 18px 40px -16px #000, 0 0 30px -12px var(--cyan); pointer-events: none; font-size: 12.5px; line-height: 1.5; }
+.tip .t { display: block; margin-bottom: 7px; font-size: 13.5px; font-weight: 800; }
+.tip dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.tip dt { color: var(--muted); }
+.tip dd { margin: 0; font-family: var(--mono); font-size: 12px; color: #fff; }
+.tip p { margin: 8px 0 0; color: var(--ink-2); }
+.lock { position: absolute; left: 50%; top: 50%; z-index: 3; translate: -50% -50%; display: grid; justify-items: center; gap: 7px; padding: 16px 28px; border: 1px solid rgba(34, 211, 238, .55); border-radius: 14px; background: rgba(3, 6, 20, .8); box-shadow: 0 0 60px -10px rgba(34, 211, 238, .6); pointer-events: none; text-align: center; animation: lock 2.8s ease forwards; }
+.lock span { font: 700 11px/1 var(--mono); letter-spacing: .32em; color: var(--cyan-2); }
+.lock b { font: 800 20px/1.25 var(--font); }
+.lock em { font: 700 12.5px/1 var(--mono); font-style: normal; letter-spacing: .1em; color: var(--mint); }
+@keyframes lock { 0% { opacity: 0; transform: scale(1.15); } 12% { opacity: 1; transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(.96); } }
+
+.rank { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+.need { margin: 12px 16px 0; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(139, 92, 246, .35); background: rgba(139, 92, 246, .08); font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
+.need b { color: #fff; }
+.top3 { display: grid; gap: 10px; margin: 12px 16px 0; }
+.empty { padding: 22px 16px; border: 1px dashed var(--line-2); border-radius: 14px; text-align: center; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.card { position: relative; display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 12px; padding: 14px 14px 12px 10px; border-radius: 16px; border: 1px solid var(--line-2); background: linear-gradient(160deg, rgba(26, 33, 78, .65), rgba(8, 11, 30, .65)); cursor: pointer; opacity: 0; transform: translateY(14px); animation: rise .6s cubic-bezier(.2, .9, .3, 1) var(--d, 0ms) forwards; transition: border-color .2s, box-shadow .2s; }
+.card:hover, .card.is-sel { border-color: rgba(34, 211, 238, .6); box-shadow: 0 0 30px -10px rgba(34, 211, 238, .6); }
+.card.r1 { border: 1.5px solid transparent; background: linear-gradient(160deg, rgba(16, 42, 74, .92), rgba(10, 12, 34, .92)) padding-box, conic-gradient(from var(--glow), var(--cyan), var(--violet), var(--magenta), var(--cyan)) border-box; animation: rise .6s cubic-bezier(.2, .9, .3, 1) var(--d, 0ms) forwards, glow-spin 6s linear infinite; }
+.card-rank { display: flex; flex-direction: column; align-items: center; padding-top: 2px; }
+.card .no { font: 700 40px/1 var(--display); background: linear-gradient(180deg, #fff, var(--cyan-2) 55%, var(--violet-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.card .lbl { display: block; margin-top: 4px; font: 500 9.5px/1 var(--mono); letter-spacing: .2em; color: var(--muted); }
+.card h3 { margin: 2px 0 0; font-size: 15.5px; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.m { min-width: 0; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--line); background: rgba(3, 6, 20, .5); }
+.m .k { display: block; margin-bottom: 5px; font: 500 9px/1 var(--mono); letter-spacing: .16em; color: var(--dim); }
+.m b { font: 700 19px/1 var(--mono); color: #fff; font-variant-numeric: tabular-nums; }
+.m small { margin-left: 3px; font-size: 11px; color: var(--muted); }
+.m em { display: block; margin-top: 5px; font: 500 10px/1.25 var(--font); font-style: normal; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m.eta b { color: var(--cyan-2); text-shadow: 0 0 14px rgba(34, 211, 238, .6); }
+.bedbar { height: 4px; margin-top: 9px; overflow: hidden; border-radius: 4px; background: rgba(255, 255, 255, .07); }
+.bedbar i { display: block; width: var(--w); height: 100%; background: linear-gradient(90deg, var(--mint), var(--cyan)); transform-origin: left; animation: grow 1.2s cubic-bezier(.2, .9, .3, 1) var(--d, 0ms) both; }
+.card .note { margin: 9px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
+.act { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.abtn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); background: rgba(10, 14, 36, .7); color: var(--ink); font: 600 12px/1 var(--font); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.abtn:hover { border-color: var(--cyan); }
+.abtn svg { width: 13px; height: 13px; flex: none; }
+.insight { position: relative; margin: 12px 16px 0; padding: 11px 12px 11px 38px; border-radius: 12px; border: 1px solid rgba(251, 191, 36, .35); background: rgba(251, 191, 36, .07); font-size: 12.5px; line-height: 1.55; color: #fbe7b5; }
+.insight::before { content: "!"; position: absolute; left: 12px; top: 11px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--amber); font: 700 11px/1 var(--mono); color: #1a1405; }
+.insight b { color: #ffe7a8; }
+.bars { list-style: none; display: grid; gap: 4px; margin: 10px 16px 16px; padding: 0; }
+.bar { display: grid; grid-template-columns: 10px minmax(0, 1.3fr) minmax(54px, 1fr) 42px; align-items: center; gap: 4px 9px; padding: 6px 8px; border-radius: 9px; cursor: pointer; opacity: 0; transform: translateX(10px); animation: rise .5s ease var(--d, 0ms) forwards; transition: background .2s; }
+.bar:hover, .bar.is-sel { background: rgba(34, 211, 238, .08); }
+.bar .dot { width: 8px; height: 8px; border-radius: 50%; }
+.bar .nm { min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar .nm small { margin-left: 6px; padding: 2px 5px; border-radius: 5px; background: rgba(251, 191, 36, .14); font: 600 9.5px/1 var(--font); color: var(--amber); }
+.bar .rk { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 6px; border-radius: 50%; background: var(--cyan); color: #03040b; font: 700 10px/1 var(--mono); vertical-align: 1px; }
+.bar .track { height: 6px; overflow: hidden; border-radius: 6px; background: rgba(255, 255, 255, .06); }
+.bar .track i { display: block; width: var(--w); height: 100%; border-radius: inherit; transform-origin: left; animation: grow 1s cubic-bezier(.2, .9, .3, 1) var(--d, 0ms) both; }
+.bar .v { text-align: right; font: 600 12px/1 var(--mono); color: #fff; font-variant-numeric: tabular-nums; }
+.bar .sub { grid-column: 2 / -1; margin-top: -1px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-rec .dot, .st-rec .track i { background: linear-gradient(90deg, var(--cyan), #5eead4); }
+.st-rec .dot { box-shadow: 0 0 10px var(--cyan); }
+.st-alt .dot, .st-alt .track i { background: linear-gradient(90deg, var(--violet), var(--violet-2)); }
+.st-hold .dot, .st-hold .track i { background: repeating-linear-gradient(45deg, var(--amber) 0 4px, rgba(251, 191, 36, .45) 4px 8px); }
+.st-out .dot, .st-out .track i { background: var(--rose); }
+.st-out .nm, .st-out .v { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(251, 113, 133, .6); }
+.bar-empty { padding: 14px 8px; font-size: 12.5px; color: var(--dim); }
+.skel { position: relative; display: flex; align-items: center; gap: 14px; height: 86px; padding: 0 16px; overflow: hidden; border-radius: 16px; border: 1px dashed var(--line-2); }
+.skel-no { font: 700 30px/1 var(--display); color: rgba(143, 243, 255, .25); }
+.skel-l { flex: 1; height: 10px; border-radius: 6px; background: rgba(255, 255, 255, .06); }
+.skel-bar { position: relative; height: 22px; overflow: hidden; border-radius: 8px; background: rgba(255, 255, 255, .035); }
+.skel::after, .skel-bar::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(34, 211, 238, .12) 50%, transparent 70%); transform: translateX(-100%); animation: shimmer 1.6s ease-in-out var(--d, 0ms) infinite; }
+
+.foot { display: flex; align-items: center; gap: 12px; min-width: 0; height: 30px; padding: 0 6px; }
+.foot-tag { flex: none; display: inline-flex; align-items: center; gap: 6px; font: 500 10.5px/1 var(--mono); letter-spacing: .2em; color: var(--rose); }
+.foot-tag i { width: 6px; height: 6px; border-radius: 50%; background: var(--rose); animation: blink 1.2s steps(2) infinite; }
+.tick { flex: 1; min-width: 0; overflow: hidden; -webkit-mask: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.tick-track { display: inline-flex; white-space: nowrap; font: 500 11.5px/1 var(--mono); color: var(--muted); animation: tick var(--dur, 60s) linear infinite; }
+.tick-track span { padding-right: 48px; }
+.tick-track b { margin-right: 6px; font-weight: 500; color: var(--cyan-2); }
+.disc { flex: none; font-size: 11.5px; color: var(--dim); white-space: nowrap; }
+
+.boot { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, rgba(20, 24, 60, .97), #03040b 70%); transition: opacity .6s, visibility .6s; }
+.boot.out { opacity: 0; visibility: hidden; }
+.boot-in { width: min(520px, 86vw); }
+.boot-ring { display: block; width: 96px; height: 96px; margin: 0 auto 24px; }
+.boot-ring .r1 { transform-origin: 48px 48px; animation: spin 2.4s linear infinite; }
+.boot-ring .r2 { transform-origin: 48px 48px; animation: spin 3.6s linear infinite reverse; }
+.boot-log { min-height: 120px; font: 500 12px/1.9 var(--mono); color: var(--cyan-2); }
+.boot-log .ok { color: var(--mint); }
+.boot-log .bad { color: var(--amber); }
+.boot-bar { height: 2px; margin-top: 14px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, .08); }
+.boot-bar i { display: block; width: 40%; height: 100%; background: linear-gradient(90deg, transparent, var(--cyan), transparent); animation: sweep 1.1s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes blink { 50% { opacity: .25; } }
+@keyframes pulse { 50% { opacity: .45; transform: scale(.8); } }
+@keyframes rise { to { opacity: 1; transform: none; } }
+@keyframes grow { from { transform: scaleX(0); } }
+@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes tick { to { transform: translateX(-50%); } }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+@media (max-width: 1180px) {
+  .app { height: auto; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: none; grid-template-areas: "top top" "mission mission" "holo holo" "rank pipe" "rank brief" "foot foot"; }
+  .holo { height: min(72vh, 720px); }
+  .brief { height: 520px; }
+  .rank { overflow: visible; }
+}
+@media (max-width: 760px) {
+  :root { --gap: 12px; }
+  .app { padding: 10px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "mission" "holo" "rank" "pipe" "brief" "foot"; }
+  .holo { height: min(100vw, 560px); min-height: 360px; }
+  .brief { height: 480px; }
+  .top { flex-wrap: wrap; gap: 8px; }
+  .hide-sm { display: none !important; }
+  .brand p { display: none; }
+  .brand h1 { font-size: 13px; letter-spacing: .2em; }
+  .m-title { font-size: 19px; }
+  .hud-state { font-size: 16px; }
+  .hud-sub, .hud-tr { display: none; }
+  .hud-bl { max-width: 92%; }
+  .hud-br { display: none; }
+  .foot { flex-wrap: wrap; height: auto; padding: 4px 2px; }
+  .disc { white-space: normal; }
+}
+@media (min-width: 1181px) and (max-height: 1000px) { .m-sub, .hint, .stages span { display: none; } .m-title { margin-top: 10px; font-size: 19px; } .stages li { padding: 3px 0; } .stages li:not(:last-child)::after { top: 26px; } .pipe-note { margin-bottom: 10px; } .composer { margin-top: 10px; } }
+.brief { min-height: 170px; }
+@media (min-width: 1181px) and (max-height: 760px) { .app { height: auto; } .holo { min-height: 660px; } .brief { min-height: 360px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<canvas id="fx" aria-hidden="true"></canvas>
+<div class="fx-vig" aria-hidden="true"></div>
+<div class="fx-scan" aria-hidden="true"></div>
+
+<div class="boot" id="boot" aria-hidden="true">
+  <div class="boot-in">
+    <svg class="boot-ring" viewBox="0 0 96 96"><circle cx="48" cy="48" r="44" fill="none" stroke="#8ff3ff" stroke-opacity=".18"/><g class="r1"><circle cx="48" cy="48" r="36" fill="none" stroke="#22d3ee" stroke-width="2.5" stroke-dasharray="40 14 8 14" stroke-linecap="round"/></g><g class="r2"><circle cx="48" cy="48" r="26" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="4 7"/></g><path d="M48 37v22M37 48h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+    <div class="boot-log" id="bootLog"></div>
+    <div class="boot-bar"><i></i></div>
+  </div>
+</div>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 42 42" aria-hidden="true"><defs><linearGradient id="lgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8ff3ff"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><circle cx="21" cy="21" r="19.5" fill="none" stroke="url(#lgA)" stroke-opacity=".35"/><g class="r1"><circle cx="21" cy="21" r="15" fill="none" stroke="url(#lgA)" stroke-width="2" stroke-dasharray="18 8 4 8" stroke-linecap="round"/></g><g class="r2"><circle cx="21" cy="21" r="10.5" fill="none" stroke="#22d3ee" stroke-opacity=".7" stroke-dasharray="3 5"/></g><path d="M21 15v12M15 21h12" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="21" cy="21" r="2.4" fill="#f472b6"/></svg>
+      <div>
+        <h1>GOLDEN TIME ROUTER</h1>
+        <p>골든타임 라우터 · 실시간 응급실 이송 추천</p>
+      </div>
+    </div>
+    <span class="grow"></span>
+    <span class="pill link-pill" id="linkPill"><i></i><span id="linkText">LINK · CONNECTING</span></span>
+    <span class="pill hide-sm"><i></i>CLAUDE OPUS 5.5</span>
+    <span class="clock hide-sm" id="clock">--:--:--</span>
+    <button class="tbtn demo" id="demoBtn" type="button">샘플 시연</button>
+    <button class="tbtn" id="newBtn" type="button">새 대화</button>
+  </header>
+
+  <section class="panel mission" aria-labelledby="missionTitle">
+    <div class="ph"><b>01</b>Mission<span class="grow"></span></div>
+    <h2 class="m-title" id="missionTitle">어디에서, <em>어떤 환자</em>인가요?</h2>
+    <p class="m-sub">장소와 환자 상황을 한 줄로 보내면 주변 응급실 10곳의 실시간 병상·수용 제한·도로 이동 시간을 모아 상위 3곳을 고릅니다.</p>
+    <div class="composer">
+      <textarea id="q" rows="1" placeholder="예) 보라매공원, 50대 다리골절 노인" aria-label="장소와 환자 상황"></textarea>
+      <button class="send" id="send" type="button" aria-label="보내기" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div>
+    <p class="hint"><kbd>Enter</kbd> 보내기 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 줄바꿈</p>
+    <div class="chips" id="chips"></div>
+    <div class="notice" id="notice" hidden></div>
+  </section>
+
+  <section class="panel pipe" aria-label="분석 단계">
+    <div class="ph"><b>02</b>Pipeline<span class="grow"></span><span class="ph-r" id="elapsed">T+00:00</span></div>
+    <ol class="stages" id="stages">
+      <li><i></i><div><b>위치 확인</b><span>카카오 장소 검색</span></div><em></em></li>
+      <li><i></i><div><b>후보 응급실 10곳</b><span>국립중앙의료원 위치 기반 조회</span></div><em></em></li>
+      <li><i></i><div><b>실시간 병상·수용 제한</b><span>가용병상 · 중증질환 수용 · 제한 메시지</span></div><em></em></li>
+      <li><i></i><div><b>도로 이동 시간</b><span>카카오모빌리티 실시간 교통</span></div><em></em></li>
+      <li><i></i><div><b>AI 판단</b><span>Claude Opus 5.5 · 순위와 근거</span></div><em></em></li>
+    </ol>
+    <p class="pipe-note" id="pipeNote">워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다.</p>
+  </section>
+
+  <section class="panel brief" aria-label="AI 브리핑">
+    <div class="ph"><b>05</b>AI Briefing<span class="grow"></span></div>
+    <div class="brief-body">
+      <div id="webchat" role="log"></div>
+      <div class="demo-brief" id="demoBrief" hidden></div>
+    </div>
+  </section>
+
+  <section class="panel holo" id="holoPanel" aria-label="응급실 위치 지도">
+    <canvas id="holo"></canvas>
+    <div class="hud hud-tl">
+      <div class="ph"><b>03</b>Holo Map</div>
+      <div class="hud-state" id="hudState">STANDBY</div>
+      <div class="hud-sub" id="hudSub">장소와 환자 상황을 기다리는 중</div>
+    </div>
+    <div class="hud hud-tr" id="hudCoord"><span>ORIGIN</span><b>--.----° N</b><b>---.----° E</b></div>
+    <div class="hud hud-bl">
+      <span class="lg"><i style="background:#f472b6;box-shadow:0 0 8px #f472b6"></i>출발지</span>
+      <span class="lg"><i style="background:#22d3ee;box-shadow:0 0 8px #22d3ee"></i>추천</span>
+      <span class="lg"><i style="background:#a78bfa"></i>대안</span>
+      <span class="lg"><i style="background:#fbbf24"></i>보류</span>
+      <span class="lg"><i style="background:#fb7185"></i>제외</span>
+    </div>
+    <div class="hud hud-br" id="hudMeta">NODES 00 · GLOBAL VIEW</div>
+    <div class="tip" id="tip" hidden></div>
+    <div class="lock" id="lock" hidden><span>ROUTE LOCKED</span><b id="lockName"></b><em id="lockEta"></em></div>
+  </section>
+
+  <aside class="panel rank" id="rank" aria-label="응급실 순위">
+    <div class="ph"><b>04</b>Route Ranking<span class="grow"></span><span class="ph-r" id="rankTime"></span></div>
+    <div class="need" id="need" hidden></div>
+    <div class="top3" id="top3"></div>
+    <div class="ph"><b>04-B</b>ETA Comparison<span class="grow"></span></div>
+    <div class="insight" id="insight" hidden></div>
+    <ol class="bars" id="bars"></ol>
+  </aside>
+
+  <footer class="foot">
+    <span class="foot-tag"><i></i>LIVE</span>
+    <div class="tick"><div class="tick-track" id="tick"></div></div>
+    <span class="disc">연구용 시뮬레이션 · 실제 이송 판단에 쓰지 않습니다</span>
+  </footer>
+</div>
+<div id="live" class="sr" aria-live="polite"></div>
+<noscript><p style="padding:24px">이 페이지는 JavaScript가 필요합니다.</p></noscript>
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const TAU = Math.PI * 2, D2R = Math.PI / 180;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const now = () => performance.now();
+const E = { out: t => 1 - Math.pow(1 - t, 3), inOut: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, in: t => t * t * t, back: t => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2) };
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MOBILE = () => matchMedia("(max-width: 760px)").matches;
+const FONT = "'Pretendard Variable', Pretendard, -apple-system, sans-serif";
+const MONO = "'JetBrains Mono', ui-monospace, Menlo, monospace";
+const pad2 = n => String(n).padStart(2, "0");
+const fmtT = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return pad2(Math.floor(s / 60)) + ":" + pad2(s % 60); };
+const fmtKm = k => k < 1 ? Math.round(k * 1000) + "m" : Math.round(k * 10) / 10 + "km";
+const num = v => { if (v == null || v === "") return null; const n = typeof v === "number" ? v : parseFloat(String(v).replace(/[^0-9.\-]/g, "")); return Number.isFinite(n) ? n : null; };
+const rgba = (c, a) => "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
+const hasJong = s => { const c = String(s).charCodeAt(String(s).length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 > 0; };
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function say(msg) { const l = $("#live"); l.textContent = ""; setTimeout(() => { l.textContent = msg; }, 40); }
+function shortName(n) {
+  let s = String(n || "").trim();
+  s = s.replace(/^(의료법인|재단법인|학교법인|사회복지법인|사단법인)\s*/, "");
+  let m = s.match(/^.*?의료재단\s*(.+)$/); if (m && m[1].length > 2) s = m[1];
+  s = s.replace(/대학교의과대학부속\s*/, "대 ").replace(/대학교\s+/, "대 ");
+  m = s.match(/^(?:서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시)립?\s*(.+)$/); if (m && m[1].length >= 4) s = m[1];
+  return s.trim() || String(n);
+}
+
+const ST = { "추천": "rec", "대안": "alt", "보류": "hold", "제외": "out" };
+const ST_TXT = { rec: "추천", alt: "대안", hold: "보류", out: "제외" };
+const ST_ORDER = { rec: 0, alt: 1, hold: 2, out: 3 };
+const COL = { rec: [34, 211, 238], alt: [167, 139, 250], hold: [251, 191, 36], out: [251, 113, 133], origin: [244, 114, 182] };
+
+// 에이전트 답 끝의 ```json 블록(웹앱용 데이터)을 꺼내고, 채팅에는 블록을 뺀 글만 보이게 합니다.
+function parseLoose(s) {
+  const t = String(s).trim();
+  const tries = [t, t.replace(/,\s*([}\]])/g, "$1"), t.replace(/[\u201c\u201d]/g, '"').replace(/,\s*([}\]])/g, "$1")];
+  for (const x of tries) { try { return JSON.parse(x); } catch (e) { } }
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1).replace(/,\s*([}\]])/g, "$1")); } catch (e) { } }
+  return null;
+}
+function extract(text) {
+  const out = { text, data: null, changed: false };
+  if (typeof text !== "string" || text.indexOf("```") < 0) return out;
+  const re = /```[ \t]*(?:json)?[ \t]*\r?\n?([\s\S]*?)```/gi;
+  let m, hit = null;
+  while ((m = re.exec(text))) if (/"hospitals"\s*:/.test(m[1])) hit = { s: m.index, e: re.lastIndex, b: m[1] };
+  if (hit) { out.data = parseLoose(hit.b); out.text = (text.slice(0, hit.s) + text.slice(hit.e)).replace(/\s+$/, ""); out.changed = true; return out; }
+  const open = text.search(/```[ \t]*(?:json)?[ \t]*\r?\n?\s*\{/i);
+  if (open >= 0 && text.indexOf("```", open + 3) < 0) { out.text = text.slice(0, open).replace(/\s+$/, ""); out.changed = true; }
+  return out;
+}
+function normalize(d) {
+  if (!d || !Array.isArray(d.hospitals)) return null;
+  const o = d.origin || {};
+  const hs = d.hospitals.filter(x => x && x.name).map((x, i) => {
+    let rank = Math.round(num(x.rank) || 0);
+    const st = ST[String(x.status || "").trim()] || (rank > 0 ? "rec" : "alt");
+    if (st !== "rec") rank = 0; else if (rank < 1) rank = 99;
+    return { i, name: String(x.name), short: shortName(x.name), rank, st, lat: num(x.lat), lng: num(x.lng), km: num(x.km), road: num(x.road), min: num(x.min), beds: num(x.beds), time: x.time ? String(x.time) : null, tel: x.tel ? String(x.tel) : null, note: x.note ? String(x.note) : "" };
+  });
+  if (!hs.length) return null;
+  hs.filter(x => x.st === "rec").sort((a, b) => a.rank - b.rank || (a.min ?? 1e9) - (b.min ?? 1e9)).forEach((x, k) => { if (k < 3) x.rank = k + 1; else { x.rank = 0; x.st = "alt"; } });
+  return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng) }, need: d.need ? String(d.need) : "", hs };
+}
+
+// 지구본 육지 점: Natural Earth 110m 육지를 1.5도 격자(240×120) 비트맵으로 줄인 값
+const LAND = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB//8////44AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPx/n/////AAAA/AAYAAAAfAAAAAAAAAAAAAAAAEO3v4f////+AAAPgAAAAAAAAcAAAAAAAAAAAAAADAAAfgP////+AAAHAAAAAAAAAMAAAAAAAAAAAAAAA9jjCAAP///+AAAAAAAAHgAAP/8AAPAAAAAAAAAAcAAAAAAD///8AAAAAAAAYAAD//gAAAAAAAAAAAAAe6zs/AAB///4AAAAAAABgDA/////wGAAAAwAEAAAI/wM//AAf//////////xwHf/////z/+AAAAB//wPI/+sEP4A///wAAAAf8AACHf////////8B8AH/////ww3mB4Af/8AAAAAAAAAAAAAAAAAAAAAAAAA////////+B/g//gAAAAAAAAAAAAAAAAAAAAAAAAH////////0P5Af4AH4AAAAAAAAAAAAAAAAAAAAAAAf///////Ng+AP4ADAAA/n////////////////+AD///////8COMAHwAAAAD/P///////////////v8AD/7/////4APwABgAAAAH/P//////////////wfAAA+AH////4APzAAAAAAAD/D/////////////JhgAAAFAAf///8AH/gAAAAAIAOD////////////4AHAAAAQAAP////wH/gAAAAAMBuP////////////wAPgAACAAAH////+f/8AAAAAWAhf////////////AAPAAAAAAAT////+f/+AAAAA3H//////////////+AOAAAAAAAB/////f/8AAAAAHn//////////////+AIAAAAAAAB//////8wAAAAAMf//////////////9AAAAAAAAAA//////2HAAAAAF///////////////4AAAAAAAAAAf/////+AgAAAAD///////////////4AAAAAAAAAAf//////wAAAAAB///yfx/////////wAAAAAAAAAAf/////yAAAAAAB/z/gPj/////////jAAAAAAAAAAf/////gAAAAAA/wY/gDx////////8HAAAAAAAAAAf/////AAAAAAA/gGfnn4////////wAAAAAAAAAAAf////+AAAAAAA/ACY//4///////1gGAAAAAAAAAAP////8AAAAAAA/ACM//4///////hwEAAAAAAAAAAH////4AAAAAAAOLgA//////////4wcAAAAAAAAAAH////4AAAAAAAN/gDC/////////wz8AAAAAAAAAAB////wAAAAAAAf/gAA/////////wDgAAAAAAAAAAA////AAAAAAAA//8YB/////////4EAAAAAAAAAAAAX///AAAAAAAA///f//////////4AAAAAAAAAAAAAX/5BAAAAAAAB//////z///////4AAAAAAAAAAAAAb/gBAAAAAAAH////8/5///////4AAAAAAAAAAAAAF/gBoAAAAAAP////+/4f//////wAAAAAAAAAAAAAE/gAAAAAAAAP////+f8wH/////gAAAAAAAAAAAAAAfgAAAAAAAAf/////P/4D/////IAAAAAAAAAAAAAAPgAQAAAAAAf/////v/8D/+f/4AAAAAAAAAAAAAAAPgwOAAAAAAf/////n/4Af8P+AAAAAAAAAAAAAAAAHxwAwAAAAAf/////n/wAfwH+wAAAAAAAAAAAAAAAB/gAAAAAAAf/////z/gAfgH+AMAAAAAAAAAAAAAAAT8AAAAAAAf/////z+AAfAF/AIAAAAAAAAAAAAAAAB+AAAAAAAf/////94AAOAB/gIAAAAAAAAAAAAAAAAMAAAAAAAf//////AAAOAA/gCAAAAAAAAAAAAAAAAEBQAAAAAP/////+MAAGAAHAFAAAAAAAAAAAAAAAACDfgAAAAH//////8AAGAACAAAAAAAAAAAAAAAAAABP/wAAAAH//////4AABABgADAAAAAAAAAAAAAAAAAP/4AAAAD//////4AABAAQABAAAAAAAAAAAAAAAAAP//gAAAA/H////wAAAACYBgAAAAAAAAAAAAAAAAAH//wAAAAAA////wAAAADYDAAAAAAAAAAAAAAAAAAP//wAAAAAA////gAAAABoPgAAAAAAAAAAAAAAAAAf//4AAAAAA///+AAAAAA4fuQAAAAAAAAAAAAAAAA///+AAAAAA///8AAAAAAYfASAAAAAAAAAAAAAAAA////AAAAAA///4AAAAAAcfYBYAAAAAAAAAAAAAAA////8AAAAAf//4AAAAAAOCEh/AAAAAAAAAAAAAAA/////AAAAAP//wAAAAAAGAAAPgAAAAAAAAAAAAAA/////gAAAAP//wAAAAAADIABPwIAAAAAAAAAAAAAf////gAAAAH//wAAAAAAAOAAPYCAAAAAAAAAAAAAP////AAAAAH//4AAAAAAAACAAMAAAAAAAAAAAAAAP///+AAAAAH//4AAAAAAAAAAAAAAAAAAAAAAAAAAH///+AAAAAH//4AAAAAAAAAHhAAAAAAAAAAAAAAAH///8AAAAAP//4IAAAAAAAAvjAAAAAAAAAAAAAAAD///8AAAAAP//4cAAAAAAAB/jgAAAAAAAAAAAAAAA///8AAAAAP//h4AAAAAAAD/7gAAAAAAAAAAAAAAAf//8AAAAAP//B4AAAAAAAH//wAAAAAAAAAAAAAAAf//4AAAAAH/+AwAAAAAAAf//4AQAAAAAAAAAAAAAf//4AAAAAH//BwAAAAAAB///8AIAAAAAAAAAAAAAf//gAAAAAD//BwAAAAAAD///+AAAAAAAAAAAAAAAf/8AAAAAAD/+BgAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAAf/8AAAAAAD/8AAAAAAAAD////AAAAAAAAAAAAAAA//4AAAAAAB/4AAAAAAAAB////AAAAAAAAAAAAAAA//wAAAAAAA/wAAAAAAAAB////AAAAAAAAAAAAAAA//gAAAAAAA/gAAAAAAAAB/h//AAAAAAAAAAAAAAA//AAAAAAAA+AAAAAAAAAB+Av+AAAAAAAAAAAAAAA/8AAAAAAAAAAAAAAAAAAAAAP8AAQAAAAAAAAAAAB/8AAAAAAAAAAAAAAAAAAAAAH8AAIAAAAAAAAAAAB/4AAAAAAAAAAAAAAAAAAAAADQAAOAAAAAAAAAAAB/gAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAIAAAAAAAAAAAB+AAAAAAAAAAAAAAAAAAAAAAAYAAwAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGAAAAAAAAAAAADwAACAefH/gAAAAAAAAAAAAAAAAEAAAAAAAAAAAB//8B///////4AAAAAAAAAAAAAAA/AAAAAAAAAAH///8P////////8AAAAAAAAAAAAAB3gAAAAATf//////8//////////+AAAAAAAAAAAgAHgAAAAH////////////////////AAAAAAAB4B////gAAAAP///////////////////4AAAAD////////4AAAAD////////////////////gAAALP///////8AAAAD/////////////////////gAABj////////wAAHg//////////////////////4AAAAD///////8AQ/AB////////////////////+AAAAB//////////AGP//////////////////////AAAAA///////////////////////////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const LANDBITS = (() => { const s = atob(LAND), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; })();
+function isLand(lat, lon) { const i = clamp(Math.floor((lon + 180) / 1.5), 0, 239), j = clamp(Math.floor((90 - lat) / 1.5), 0, 119), k = j * 240 + i; return (LANDBITS[k >> 3] >> (7 - (k & 7))) & 1; }
+
+// 배경: 보라·청록 데이터 흐름
+const FX = (() => {
+  const cv = $("#fx"), ctx = cv.getContext("2d");
+  let W = 0, H = 0, DPR = 1, P = [], raf = 0, boost = 0, boostT = 0;
+  function spawn(p, any) { p.x = any ? Math.random() * W : -10 * DPR; p.y = Math.random() * H; p.v = .35 + Math.random() * 1.05; p.c = Math.random(); p.life = 260 + Math.random() * 520; p.tr = []; return p; }
+  function resize() { DPR = Math.min(window.devicePixelRatio || 1, 1.5); W = cv.width = Math.round(innerWidth * DPR); H = cv.height = Math.round(innerHeight * DPR); const n = Math.round(clamp(innerWidth * innerHeight / 9000, 40, 190)); P = Array.from({ length: n }, () => spawn({}, true)); }
+  function field(x, y, t) { x /= DPR; y /= DPR; return Math.sin(x * .0012 + t * .00008) * 1.1 + Math.cos(y * .0017 - t * .00006) * .9 + Math.sin((x + y) * .0006) * .5; }
+  function frame(t) {
+    ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = "lighter"; ctx.lineWidth = 1.1 * DPR; ctx.lineCap = "round";
+    boost += (boostT - boost) * .03;
+    const sp = 1 + boost * 1.6;
+    for (const p of P) {
+      const a = field(p.x, p.y, t) * .85;
+      p.x += (Math.cos(a) * .55 + .75) * p.v * DPR * sp; p.y += Math.sin(a) * p.v * DPR * .85 * sp;
+      p.tr.push(p.x, p.y); if (p.tr.length > 26) p.tr.splice(0, 2);
+      if (--p.life < 0 || p.x > W + 20 * DPR || p.y < -20 * DPR || p.y > H + 20 * DPR) { spawn(p, false); continue; }
+      if (p.tr.length < 4) continue;
+      const cyan = p.c > .55 - boost * .3;
+      ctx.strokeStyle = cyan ? "rgba(34,211,238," + (.08 + .16 * p.v / 1.4) + ")" : "rgba(139,92,246," + (.1 + .2 * p.v / 1.4) + ")";
+      ctx.beginPath(); ctx.moveTo(p.tr[0], p.tr[1]); for (let k = 2; k < p.tr.length; k += 2) ctx.lineTo(p.tr[k], p.tr[k + 1]); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+  function loop(t) { frame(t); raf = requestAnimationFrame(loop); }
+  addEventListener("resize", resize); resize();
+  if (!REDUCED) raf = requestAnimationFrame(loop);
+  document.addEventListener("visibilitychange", () => { if (REDUCED) return; if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else if (!raf) raf = requestAnimationFrame(loop); });
+  return { boost: on => { boostT = on ? 1 : 0; } };
+})();
+// 홀로 맵: 점 지구본 → 한국으로 확대 → 레이더 위 응급실 노드와 경로
+const Holo = (() => {
+  const panel = $("#holoPanel"), cv = $("#holo"), ctx = cv.getContext("2d"), tipEl = $("#tip");
+  let W = 1, H = 1, DPR = 1, cx = 0, cy = 0, Rh = 100, raf = 0, last = now(), ga = 1;
+  const G = { lon0: 95 * D2R, lat0: 24 * D2R, zoom: 1, alpha: 1, spin: 1, hi: 0 };
+  const RD = { alpha: 0, sweep: -Math.PI / 2, lab: 0 };
+  const S = { mode: "idle", stage: 0, data: null, nodes: [], ranked: [], nearest: null, nearestLab: null, originLab: null, arcsEnd: 0, ringStep: 1, ringN: 4, revealAt: 0, sel: -1, hov: -1, queued: null, locateEnd: 0, pick: null, tm: 0 };
+  const tweens = [];
+  function tween(o, k, to, ms, fn = E.inOut, delay = 0) { if (REDUCED) { o[k] = to; return; } tweens.push({ o, k, to, ms, fn, t0: now() + delay, from: null }); }
+  function runTweens(t) {
+    for (let i = tweens.length - 1; i >= 0; i--) {
+      const w = tweens[i]; if (t < w.t0) continue;
+      if (w.from === null) w.from = w.o[w.k];
+      const p = clamp((t - w.t0) / w.ms, 0, 1); w.o[w.k] = w.from + (w.to - w.from) * w.fn(p);
+      if (p >= 1) tweens.splice(i, 1);
+    }
+  }
+
+  const PTS = (() => {
+    const N = 9000, GA = Math.PI * (3 - Math.sqrt(5)), land = [], sea = [];
+    for (let i = 0; i < N; i++) {
+      const y = 1 - 2 * (i + .5) / N, r = Math.sqrt(1 - y * y), th = i * GA;
+      const lat = Math.asin(y), lon = Math.atan2(Math.sin(th) * r, Math.cos(th) * r);
+      const kr = lat > 33 * D2R && lat < 39.5 * D2R && lon > 124.5 * D2R && lon < 130 * D2R ? 1 : 0;
+      if (isLand(lat / D2R, lon / D2R)) land.push(Math.cos(lat), Math.sin(lat), lon, kr);
+      else if (i % 5 === 0) sea.push(Math.cos(lat), Math.sin(lat), lon, 0);
+    }
+    return { land: new Float32Array(land), sea: new Float32Array(sea) };
+  })();
+  const HUB = [37.57, 126.98];
+  const ARCS = [[35.68, 139.69], [1.35, 103.82], [-33.87, 151.21], [37.77, -122.42], [51.51, -.13], [25.2, 55.27], [22.32, 114.17], [40.71, -74], [-23.55, -46.63], [19.08, 72.88], [55.75, 37.62], [-1.29, 36.82]].map((c, k) => {
+    const v = ([la, lo]) => [Math.cos(la * D2R) * Math.cos(lo * D2R), Math.sin(la * D2R), Math.cos(la * D2R) * Math.sin(lo * D2R)];
+    const A = v(HUB), B = v(c), w = Math.acos(clamp(A[0] * B[0] + A[1] * B[1] + A[2] * B[2], -1, 1)), sw = Math.sin(w) || 1, n = 60, P = new Float32Array((n + 1) * 3);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, f1 = Math.sin((1 - t) * w) / sw, f2 = Math.sin(t * w) / sw, x = f1 * A[0] + f2 * B[0], y = f1 * A[1] + f2 * B[1], z = f1 * A[2] + f2 * B[2];
+      P[i * 3] = Math.asin(clamp(y, -1, 1)); P[i * 3 + 1] = Math.atan2(z, x); P[i * 3 + 2] = 1 + Math.sin(Math.PI * t) * (.04 + .22 * w / Math.PI);
+    }
+    return { P, n, off: (k * .618) % 1, sp: .00008 + (k % 4) * .00002, c: [[34, 211, 238], [139, 92, 246], [244, 114, 182]][k % 3] };
+  });
+
+  const SPR = new Map();
+  function spr(c) {
+    const key = c.join(); let o = SPR.get(key); if (o) return o;
+    const s = 64; o = document.createElement("canvas"); o.width = o.height = s;
+    const g = o.getContext("2d"), gr = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(.16, rgba(c, .95)); gr.addColorStop(.45, rgba(c, .28)); gr.addColorStop(1, rgba(c, 0));
+    g.fillStyle = gr; g.fillRect(0, 0, s, s); SPR.set(key, o); return o;
+  }
+  function glow(c, x, y, r, a = 1) { if (r <= 0) return; ctx.globalAlpha = ga * a; ctx.drawImage(spr(c), x - r, y - r, r * 2, r * 2); ctx.globalAlpha = ga; }
+  function rr(x, y, w, hh, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + hh, r); ctx.arcTo(x + w, y + hh, x, y + hh, r); ctx.arcTo(x, y + hh, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function project(la, lo, R, hh, sl0, cl0) { const cl = Math.cos(la), sl = Math.sin(la), dl = lo - G.lon0, cd = Math.cos(dl); return [cx + R * hh * cl * Math.sin(dl), cy - R * hh * (cl0 * sl - sl0 * cl * cd), sl0 * sl + cl0 * cl * cd]; }
+
+  let gridC = null;
+  function grid(R) {
+    if (gridC && gridC.R === R && gridC.W === W && gridC.H === H) return gridC.c;
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const g = c.getContext("2d"), step = 18 * DPR, s = 1.2 * DPR; g.fillStyle = "rgb(143,243,255)";
+    for (let y = cy - Math.floor(R / step) * step; y <= cy + R; y += step) for (let x = cx - Math.floor(R / step) * step; x <= cx + R; x += step) {
+      const d = Math.hypot(x - cx, y - cy); if (d > R - 4 * DPR) continue;
+      g.globalAlpha = .07 + .13 * (1 - d / R); g.fillRect(x - s / 2, y - s / 2, s, s);
+    }
+    gridC = { R, W, H, c }; return c;
+  }
+  function arcSeg(r, rot, segs, col, lw) { ctx.strokeStyle = col; ctx.lineWidth = lw * DPR; ctx.lineCap = "round"; for (const [a, b] of segs) { ctx.beginPath(); ctx.arc(0, 0, r, a + rot, b + rot); ctx.stroke(); } }
+  function drawRing(t) {
+    const R = Rh; ctx.save(); ctx.translate(cx, cy);
+    ctx.lineWidth = DPR; ctx.strokeStyle = "rgba(103,232,249,.2)"; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.stroke();
+    const rot = t * .00003; ctx.beginPath();
+    for (let d = 0; d < 360; d += 2) { const a = d * D2R + rot, L = (d % 30 === 0 ? 11 : d % 10 === 0 ? 7 : 3.5) * DPR; ctx.moveTo(Math.cos(a) * R, Math.sin(a) * R); ctx.lineTo(Math.cos(a) * (R - L), Math.sin(a) * (R - L)); }
+    ctx.strokeStyle = "rgba(103,232,249,.3)"; ctx.stroke();
+    arcSeg(R * 1.035, t * .00016, [[0, .85], [1.25, 2.1], [3.2, 3.5], [4.1, 5.5]], "rgba(139,92,246,.6)", 2.2);
+    arcSeg(R * .955, -t * .0001, [[.3, 1.1], [2.5, 3.8], [4.9, 5.85]], "rgba(34,211,238,.42)", 1.2);
+    arcSeg(R * 1.07, -t * .00006, [[.9, 1], [2.2, 2.26], [3.9, 4.06], [5.3, 5.37]], "rgba(244,114,182,.75)", 3);
+    ctx.save(); ctx.rotate(t * .0004); ctx.fillStyle = "rgba(143,243,255,.9)"; ctx.beginPath(); ctx.moveTo(R + 4 * DPR, 0); ctx.lineTo(R + 11 * DPR, -4 * DPR); ctx.lineTo(R + 11 * DPR, 4 * DPR); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.font = "500 " + 10 * DPR + "px " + MONO; ctx.fillStyle = "rgba(143,243,255,.55)"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    [["N", -Math.PI / 2], ["E", 0], ["S", Math.PI / 2], ["W", Math.PI]].forEach(([s, a]) => ctx.fillText(s, Math.cos(a) * (R + 17 * DPR), Math.sin(a) * (R + 17 * DPR)));
+    ctx.restore();
+  }
+
+  function drawGlobe(t) {
+    if (G.alpha < .01) return;
+    const R = Rh * .74 * G.zoom, sl0 = Math.sin(G.lat0), cl0 = Math.cos(G.lat0);
+    ga = G.alpha; ctx.save(); ctx.globalAlpha = ga * clamp((2.2 - G.zoom) / 1.2, 0, 1);
+    let g = ctx.createRadialGradient(cx, cy, R * .9, cx, cy, R * 1.25);
+    g.addColorStop(0, "rgba(120,110,255,.28)"); g.addColorStop(.35, "rgba(70,140,255,.1)"); g.addColorStop(1, "rgba(34,211,238,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.25, 0, TAU); ctx.fill();
+    g = ctx.createRadialGradient(cx - R * .35, cy - R * .45, R * .05, cx, cy, R);
+    g.addColorStop(0, "rgba(70,80,190,.32)"); g.addColorStop(.72, "rgba(12,15,46,.6)"); g.addColorStop(1, "rgba(40,50,140,.4)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+    ctx.strokeStyle = "rgba(150,170,255,.35)"; ctx.lineWidth = DPR; ctx.stroke(); ctx.globalAlpha = ga;
+    const B = [[], [], [], []], K = [], P = PTS.land;
+    for (let i = 0; i < P.length; i += 4) {
+      const cl = P[i], sl = P[i + 1], dl = P[i + 2] - G.lon0, cd = Math.cos(dl), z = sl0 * sl + cl0 * cl * cd;
+      if (z <= 0) continue;
+      const x = cx + R * cl * Math.sin(dl), y = cy - R * (cl0 * sl - sl0 * cl * cd);
+      if (P[i + 3] && G.hi > .05) K.push(x, y); else B[z > .75 ? 3 : z > .5 ? 2 : z > .25 ? 1 : 0].push(x, y);
+    }
+    const s = (1.3 + .55 * Math.min(G.zoom - 1, 2.5)) * DPR, COLS = ["rgba(139,92,246,.42)", "rgba(129,140,248,.62)", "rgba(103,232,249,.82)", "rgba(220,250,255,.95)"];
+    for (let b = 0; b < 4; b++) { ctx.fillStyle = COLS[b]; const A = B[b]; for (let k = 0; k < A.length; k += 2) ctx.fillRect(A[k] - s / 2, A[k + 1] - s / 2, s, s); }
+    if (K.length) { ctx.fillStyle = rgba(COL.origin, .6 + .4 * G.hi); const s2 = s * 1.6; for (let k = 0; k < K.length; k += 2) ctx.fillRect(K[k] - s2 / 2, K[k + 1] - s2 / 2, s2, s2); }
+    ctx.fillStyle = "rgba(99,102,241,.2)"; const SE = PTS.sea, s3 = s * .8;
+    for (let i = 0; i < SE.length; i += 4) { const cl = SE[i], sl = SE[i + 1], dl = SE[i + 2] - G.lon0, cd = Math.cos(dl); if (sl0 * sl + cl0 * cl * cd <= 0) continue; ctx.fillRect(cx + R * cl * Math.sin(dl) - s3 / 2, cy - R * (cl0 * sl - sl0 * cl * cd) - s3 / 2, s3, s3); }
+    if (G.zoom < 1.6) drawArcs(t, R, sl0, cl0);
+    if (G.hi > .05) drawTarget(t, R, sl0, cl0);
+    ctx.restore(); ga = 1;
+  }
+  function drawArcs(t, R, sl0, cl0) {
+    const fade = clamp(1 - (G.zoom - 1) / .6, 0, 1) * (1 - G.hi); if (fade <= .01) return;
+    ctx.lineWidth = 1.2 * DPR; ctx.lineCap = "round";
+    const hub = project(HUB[0] * D2R, HUB[1] * D2R, R, 1, sl0, cl0);
+    if (hub[2] > 0) { ctx.globalCompositeOperation = "lighter"; glow([244, 114, 182], hub[0], hub[1], (12 + 4 * Math.sin(t * .004)) * DPR, fade); ctx.globalCompositeOperation = "source-over"; }
+    for (const a of ARCS) {
+      const n = a.n, xs = new Float32Array((n + 1) * 2), vis = new Uint8Array(n + 1);
+      for (let i = 0; i <= n; i++) { const hh = a.P[i * 3 + 2], p = project(a.P[i * 3], a.P[i * 3 + 1], R, hh, sl0, cl0); xs[i * 2] = p[0]; xs[i * 2 + 1] = p[1]; vis[i] = p[2] >= 0 || hh * hh * (1 - p[2] * p[2]) > 1 ? 1 : 0; }
+      ctx.strokeStyle = rgba(a.c, .28 * fade); ctx.beginPath(); let pen = false;
+      for (let i = 0; i <= n; i++) { if (vis[i]) { if (pen) ctx.lineTo(xs[i * 2], xs[i * 2 + 1]); else ctx.moveTo(xs[i * 2], xs[i * 2 + 1]); pen = true; } else pen = false; }
+      ctx.stroke();
+      const hi = Math.floor(((t * a.sp + a.off) % 1) * n);
+      if (!vis[hi]) continue;
+      ctx.strokeStyle = rgba(a.c, .85 * fade); ctx.beginPath(); pen = false;
+      for (let i = Math.max(0, hi - 9); i <= hi; i++) { if (!vis[i]) { pen = false; continue; } if (pen) ctx.lineTo(xs[i * 2], xs[i * 2 + 1]); else ctx.moveTo(xs[i * 2], xs[i * 2 + 1]); pen = true; }
+      ctx.stroke(); ctx.globalCompositeOperation = "lighter"; glow(a.c, xs[hi * 2], xs[hi * 2 + 1], 9 * DPR, fade); ctx.globalCompositeOperation = "source-over";
+    }
+  }
+  function drawTarget(t, R, sl0, cl0) {
+    const p = project(36.3 * D2R, 127.8 * D2R, R, 1, sl0, cl0); if (p[2] <= 0) return;
+    const x = p[0], y = p[1], k = G.hi, s = (24 + 8 * Math.sin(t * .006)) * DPR;
+    ctx.strokeStyle = rgba(COL.origin, .9 * k); ctx.lineWidth = 1.6 * DPR;
+    for (let q = 0; q < 4; q++) { const a = q * Math.PI / 2 + t * .0015; ctx.beginPath(); ctx.arc(x, y, s, a, a + .8); ctx.stroke(); }
+    ctx.globalAlpha = ga * k * .55; ctx.beginPath(); ctx.moveTo(x - s * 2.4, y); ctx.lineTo(x - s * 1.25, y); ctx.moveTo(x + s * 1.25, y); ctx.lineTo(x + s * 2.4, y); ctx.moveTo(x, y - s * 2.4); ctx.lineTo(x, y - s * 1.25); ctx.moveTo(x, y + s * 1.25); ctx.lineTo(x, y + s * 2.4); ctx.stroke(); ctx.globalAlpha = ga;
+    ctx.font = "600 " + 10.5 * DPR + "px " + MONO; ctx.fillStyle = rgba(COL.origin, k); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText("TARGET · KOREA", x + s + 10 * DPR, y - s - 4 * DPR);
+  }
+
+  function drawRadar(t) {
+    if (RD.alpha < .01) return;
+    const R = Rh * .86; ga = RD.alpha; ctx.save(); ctx.globalAlpha = ga;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    g.addColorStop(0, "rgba(34,211,238,.08)"); g.addColorStop(.75, "rgba(60,70,180,.05)"); g.addColorStop(1, "rgba(139,92,246,.12)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+    ctx.drawImage(grid(R), 0, 0);
+    const n = S.data ? S.ringN : 4; ctx.lineWidth = DPR;
+    for (let k = 1; k <= n; k++) { ctx.strokeStyle = k === n ? "rgba(139,92,246,.5)" : "rgba(103,232,249,.17)"; ctx.setLineDash(k === n ? [] : [3 * DPR, 5 * DPR]); ctx.beginPath(); ctx.arc(cx, cy, R * k / n, 0, TAU); ctx.stroke(); }
+    ctx.setLineDash([]); ctx.strokeStyle = "rgba(103,232,249,.13)"; ctx.beginPath(); ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy); ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R); ctx.stroke();
+    if (S.data && RD.lab > .01) {
+      ctx.globalAlpha = ga * RD.lab; ctx.font = "500 " + 10 * DPR + "px " + MONO; ctx.fillStyle = "rgba(143,243,255,.8)"; ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      const a = -Math.PI / 4 - .12; for (let k = 1; k <= n; k++) { const r = R * k / n; ctx.fillText(fmtKm(S.ringStep * k), cx + Math.cos(a) * r + 4 * DPR, cy + Math.sin(a) * r); }
+      ctx.globalAlpha = ga;
+    }
+    drawSweep(R);
+    if (S.data) drawData(t); else drawScan(R, t);
+    ctx.restore(); ga = 1;
+  }
+  function drawSweep(R) {
+    const a = RD.sweep, span = .95, k = S.data ? .45 : 1;
+    if (ctx.createConicGradient) {
+      const cg = ctx.createConicGradient(a - span, cx, cy), e = span / TAU;
+      cg.addColorStop(0, "rgba(34,211,238,0)"); cg.addColorStop(e * .7, "rgba(34,211,238," + .07 * k + ")"); cg.addColorStop(e, "rgba(103,232,249," + .3 * k + ")"); cg.addColorStop(Math.min(1, e + .002), "rgba(34,211,238,0)"); cg.addColorStop(1, "rgba(34,211,238,0)");
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(cx, cy, R, 0, TAU); ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(143,243,255," + .6 * k + ")"; ctx.lineWidth = 1.4 * DPR; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); ctx.stroke();
+  }
+  const SRC = [{ a: -2.36, t: "KAKAO LOCAL", c: [250, 204, 21] }, { a: -.79, t: "NEMC ER LIST", c: [34, 211, 238] }, { a: .79, t: "NEMC LIVE BEDS", c: [52, 211, 153] }, { a: 2.36, t: "KAKAO MOBILITY", c: [244, 114, 182] }];
+  function drawScan(R, t) {
+    const Rs = Rh * .96, small = W < 600 * DPR;
+    SRC.forEach((s, k) => {
+      const on = S.stage === k + 1, done = S.stage > k + 1, lv = S.mode === "idle" ? .12 : on ? 1 : done ? .4 : .2;
+      const sx = cx + Math.cos(s.a) * Rs, sy = cy + Math.sin(s.a) * Rs, qx = cx + Math.cos(s.a + .6) * R * .5, qy = cy + Math.sin(s.a + .6) * R * .5;
+      ctx.strokeStyle = rgba(s.c, .08 + .25 * lv); ctx.lineWidth = DPR; ctx.setLineDash([2 * DPR, 6 * DPR]); ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(qx, qy, cx, cy); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalCompositeOperation = "lighter";
+      const cnt = on ? 7 : 2;
+      for (let i = 0; i < cnt; i++) { const u = (t * (on ? .0005 : .0002) + i / cnt + k * .13) % 1, v = 1 - u; glow(s.c, v * v * sx + 2 * v * u * qx + u * u * cx, v * v * sy + 2 * v * u * qy + u * u * cy, (on ? 9 : 6) * DPR, lv * (1 - u * .5)); }
+      glow(s.c, sx, sy, (on ? 18 : 11) * DPR, .4 + .6 * lv);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.font = (on ? "700 " : "500 ") + (small ? 8.5 : 10) * DPR + "px " + MONO; ctx.fillStyle = rgba(s.c, .35 + .65 * lv); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const lr = Rs - 24 * DPR; ctx.fillText(s.t, cx + Math.cos(s.a) * lr, cy + Math.sin(s.a) * lr);
+    });
+    const st5 = S.stage >= 5, pulse = .5 + .5 * Math.sin(t * .006);
+    ctx.globalCompositeOperation = "lighter"; glow([139, 92, 246], cx, cy, (30 + 12 * pulse) * DPR * (st5 ? 1.5 : 1), st5 ? .9 : .5); glow([34, 211, 238], cx, cy, 13 * DPR, .9); ctx.globalCompositeOperation = "source-over";
+    ctx.lineWidth = 1.6 * DPR; ctx.lineCap = "round";
+    [[22, .0021, [139, 92, 246]], [31, -.0015, [34, 211, 238]], [41, .0009, [244, 114, 182]]].forEach(([r, sp, c], i) => { const a0 = t * sp * (st5 ? 2.2 : 1); ctx.strokeStyle = rgba(c, .75); ctx.beginPath(); ctx.arc(cx, cy, r * DPR, a0, a0 + 1.9 + i * .5); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy, r * DPR, a0 + Math.PI, a0 + Math.PI + .8); ctx.stroke(); });
+    if (S.mode !== "idle") { ctx.font = "700 " + 9.5 * DPR + "px " + MONO; ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(st5 ? "AI DECISION" : "COLLECTING", cx, cy + 58 * DPR); }
+  }
+
+  function drawData(t) {
+    const tt = t - S.revealAt; ctx.lineWidth = DPR;
+    for (const n of S.nodes) { if (n.h.rank) continue; const p = clamp((tt - n.t0) / 420, 0, 1); if (p <= 0) continue; ctx.strokeStyle = rgba(COL[n.h.st], .14 * p); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (n.x - cx) * p, cy + (n.y - cy) * p); ctx.stroke(); }
+    const nr = S.nearest;
+    if (nr && nr.h.rank !== 1) {
+      const p = E.out(clamp((tt - S.arcsEnd) / 700, 0, 1));
+      if (p > 0) { ctx.save(); ctx.setLineDash([5 * DPR, 5 * DPR]); ctx.lineDashOffset = -t * .02 * DPR; ctx.strokeStyle = rgba(COL.hold, .85); ctx.lineWidth = 1.5 * DPR; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + (nr.x - cx) * p, cy + (nr.y - cy) * p); ctx.stroke(); ctx.restore(); }
+    }
+    for (const n of S.ranked) {
+      const p = clamp((tt - n.a0) / 700, 0, 1); if (p <= 0) continue;
+      const one = n.h.rank === 1, c = one ? COL.rec : [139, 160, 250], P = n.curve, cnt = P.length / 2 - 1, m = Math.max(1, Math.round(cnt * E.out(p)));
+      const lg = ctx.createLinearGradient(cx, cy, n.x, n.y); lg.addColorStop(0, rgba(COL.origin, .95)); lg.addColorStop(1, rgba(c, .95));
+      ctx.strokeStyle = lg; ctx.lineWidth = (one ? 2.8 : 1.7) * DPR; ctx.lineCap = "round"; ctx.shadowColor = rgba(c, .9); ctx.shadowBlur = (one ? 16 : 7) * DPR;
+      ctx.beginPath(); ctx.moveTo(P[0], P[1]); for (let i = 1; i <= m; i++) ctx.lineTo(P[i * 2], P[i * 2 + 1]); ctx.stroke(); ctx.shadowBlur = 0;
+      if (p >= 1) { ctx.globalCompositeOperation = "lighter"; const k = one ? 4 : 2; for (let j = 0; j < k; j++) { const ix = Math.floor(((t * (one ? .00042 : .0003) + j / k) % 1) * cnt); glow(one ? [200, 255, 255] : c, P[ix * 2], P[ix * 2 + 1], (one ? 10 : 7) * DPR, .95); } ctx.globalCompositeOperation = "source-over"; }
+    }
+    for (const n of S.nodes) drawNode(n, t, tt);
+    drawOrigin(t, tt);
+    drawLabels(tt);
+  }
+  function bracket(x, y, r, rot, c) { ctx.strokeStyle = rgba(c, .85); ctx.lineWidth = 1.6 * DPR; for (let k = 0; k < 4; k++) { const a = rot + k * Math.PI / 2; ctx.beginPath(); ctx.arc(x, y, r, a, a + .7); ctx.stroke(); } }
+  function badge(x, y, rk, c) { const r = 8.5 * DPR; ctx.fillStyle = "rgba(3,5,16,.92)"; ctx.strokeStyle = rgba(c, .95); ctx.lineWidth = 1.4 * DPR; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#fff"; ctx.font = "700 " + 10.5 * DPR + "px " + MONO; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(rk), x, y + .5 * DPR); }
+  function drawNode(n, t, tt) {
+    const p = clamp((tt - n.t0) / 450, 0, 1); if (p <= 0) return;
+    const x = n.h, c = COL[x.st], out = x.st === "out", one = x.rank === 1;
+    const r = Math.max(0, (x.rank ? 6.5 : 4.4) * DPR * E.back(p) + (x.beds ? Math.min(Math.sqrt(x.beds), 4.5) * .45 * DPR : 0));
+    ctx.globalCompositeOperation = "lighter"; glow(c, n.x, n.y, r * (one ? 7 : 4.5), out ? .3 : .75); ctx.globalCompositeOperation = "source-over";
+    if (p < 1) { ctx.strokeStyle = rgba(c, (1 - p) * .9); ctx.lineWidth = 1.5 * DPR; ctx.beginPath(); ctx.arc(n.x, n.y, r + 26 * DPR * p, 0, TAU); ctx.stroke(); }
+    ctx.fillStyle = rgba(c, out ? .55 : 1); ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, TAU); ctx.fill();
+    if (!out) { ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.beginPath(); ctx.arc(n.x, n.y, r * .38, 0, TAU); ctx.fill(); }
+    if (x.st === "hold") { ctx.strokeStyle = rgba(c, .85); ctx.lineWidth = 1.2 * DPR; ctx.setLineDash([2 * DPR, 3 * DPR]); ctx.beginPath(); ctx.arc(n.x, n.y, r + 4 * DPR, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+    if (out) { const d = r + 2 * DPR; ctx.strokeStyle = rgba(c, .9); ctx.lineWidth = 1.4 * DPR; ctx.beginPath(); ctx.moveTo(n.x - d, n.y - d); ctx.lineTo(n.x + d, n.y + d); ctx.moveTo(n.x + d, n.y - d); ctx.lineTo(n.x - d, n.y + d); ctx.stroke(); }
+    if (one && p >= 1) { const u = (t % 1800) / 1800; ctx.strokeStyle = rgba(c, .7 * (1 - u)); ctx.lineWidth = 1.5 * DPR; ctx.beginPath(); ctx.arc(n.x, n.y, r + 30 * DPR * u, 0, TAU); ctx.stroke(); bracket(n.x, n.y, r + 12 * DPR, t * .0012, c); }
+    if (x.i === S.sel || x.i === S.hov) bracket(n.x, n.y, r + (one ? 18 : 10) * DPR, -t * .002, [255, 255, 255]);
+    if (x.rank && p >= 1) badge(n.x + r * .9 + 7 * DPR, n.y - r * .9 - 7 * DPR, x.rank, c);
+  }
+  function drawOrigin(t, tt) {
+    const c = COL.origin, p = clamp(tt / 500, 0, 1); if (p <= 0) return;
+    for (let k = 0; k < 3; k++) { const u = (t / 2400 + k / 3) % 1; ctx.strokeStyle = rgba(c, .55 * (1 - u) * p); ctx.lineWidth = 1.3 * DPR; ctx.beginPath(); ctx.arc(cx, cy, (8 + 46 * u) * DPR, 0, TAU); ctx.stroke(); }
+    ctx.globalCompositeOperation = "lighter"; glow(c, cx, cy, 34 * DPR * p, .9); ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, cy, 3.6 * DPR * p, 0, TAU); ctx.fill();
+    const a = 9 * DPR, b = 16 * DPR; ctx.strokeStyle = rgba(c, .9 * p); ctx.lineWidth = 1.4 * DPR;
+    ctx.beginPath(); ctx.moveTo(cx - b, cy); ctx.lineTo(cx - a, cy); ctx.moveTo(cx + a, cy); ctx.lineTo(cx + b, cy); ctx.moveTo(cx, cy - b); ctx.lineTo(cx, cy - a); ctx.moveTo(cx, cy + a); ctx.lineTo(cx, cy + b); ctx.stroke();
+  }
+  function drawLabels(tt) {
+    ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const L = S.originLab, po = clamp((tt - 150) / 500, 0, 1);
+    if (L && po > 0) {
+      ctx.globalAlpha = ga * po; rr(L.x, L.y, L.w, L.h, 7 * DPR); ctx.fillStyle = "rgba(6,8,22,.88)"; ctx.fill(); ctx.strokeStyle = rgba(COL.origin, .85); ctx.lineWidth = 1.2 * DPR; ctx.stroke();
+      ctx.font = "700 " + 9 * DPR + "px " + MONO; ctx.fillStyle = rgba(COL.origin, 1); ctx.fillText("ORIGIN", L.x + 9 * DPR, L.y + L.h / 2 + .5 * DPR);
+      ctx.font = "700 " + 12 * DPR + "px " + FONT; ctx.fillStyle = "#fff"; ctx.fillText(L.txt, L.x + L.tx, L.y + L.h / 2 + .5 * DPR);
+    }
+    const NL = S.nearestLab;
+    if (NL) { const p = clamp((tt - S.arcsEnd - 400) / 500, 0, 1); if (p > 0) { ctx.globalAlpha = ga * p; ctx.font = "700 " + 10 * DPR + "px " + FONT; ctx.lineWidth = 4 * DPR; ctx.strokeStyle = "rgba(3,4,11,.9)"; ctx.strokeText(NL.txt, NL.x, NL.y); ctx.fillStyle = rgba(COL.hold, 1); ctx.fillText(NL.txt, NL.x, NL.y); } }
+    for (const n of S.nodes) {
+      const lb = n.lab; if (!lb) continue; const p = clamp((tt - n.t0 - 200) / 400, 0, 1); if (p <= 0) continue;
+      ctx.globalAlpha = ga * p * (n.h.st === "out" ? .65 : 1); ctx.font = lb.font; ctx.lineWidth = 4 * DPR; ctx.strokeStyle = "rgba(3,4,11,.88)";
+      const y = lb.y + lb.h / 2; ctx.strokeText(lb.txt, lb.x, y); ctx.fillStyle = n.h.rank ? "#ffffff" : rgba(COL[n.h.st], 1); ctx.fillText(lb.txt, lb.x, y);
+    }
+    ctx.globalAlpha = ga;
+  }
+
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  function niceStep(m) { for (const s of [.1, .2, .25, .5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100]) if (m / s <= 4.2) return s; return 200; }
+  function curve(x0, y0, x1, y1, bend) { const qx = (x0 + x1) / 2 - (y1 - y0) * bend, qy = (y0 + y1) / 2 + (x1 - x0) * bend, N = 40, P = new Float32Array((N + 1) * 2); for (let i = 0; i <= N; i++) { const u = i / N, v = 1 - u; P[i * 2] = v * v * x0 + 2 * v * u * qx + u * u * x1; P[i * 2 + 1] = v * v * y0 + 2 * v * u * qy + u * u * y1; } return P; }
+  function revealDur(d) { const m = d.hs.filter(x => x.lat != null && x.lng != null); return 300 + m.length * 110 + 150 + m.filter(x => x.rank).length * 380 + 350; }
+  function layout() {
+    S.nodes = []; S.ranked = []; S.nearest = null; S.originLab = null; S.nearestLab = null;
+    const d = S.data; if (!d) return;
+    const R = Rh * .86, o = d.origin, pts = d.hs.filter(x => x.lat != null && x.lng != null);
+    let lat0 = o.lat, lng0 = o.lng;
+    if (lat0 == null || lng0 == null) { if (!pts.length) return; lat0 = pts.reduce((s, x) => s + x.lat, 0) / pts.length; lng0 = pts.reduce((s, x) => s + x.lng, 0) / pts.length; }
+    const kx = Math.cos(lat0 * D2R) * 111.32, ky = 110.574; let maxKm = .3;
+    const P = pts.map(x => { const dx = (x.lng - lng0) * kx, dy = (x.lat - lat0) * ky, dist = Math.hypot(dx, dy); maxKm = Math.max(maxKm, dist); return { h: x, dx, dy, dist }; });
+    S.ringStep = niceStep(maxKm * 1.06); S.ringN = Math.max(1, Math.ceil(maxKm * 1.06 / S.ringStep)); const sc = R / (S.ringN * S.ringStep);
+    P.sort((a, b) => a.dist - b.dist);
+    S.nodes = P.map((p, k) => ({ h: p.h, x: cx + p.dx * sc, y: cy - p.dy * sc, t0: 300 + k * 110, dist: p.dist }));
+    S.ranked = S.nodes.filter(n => n.h.rank).sort((a, b) => a.h.rank - b.h.rank);
+    const base = 300 + S.nodes.length * 110 + 150;
+    S.ranked.forEach((n, k) => { n.a0 = base + k * 380; n.curve = curve(cx, cy, n.x, n.y, k % 2 ? -.17 : .17); });
+    S.arcsEnd = base + S.ranked.length * 380 + 350;
+    S.nearest = S.nodes.filter(n => n.h.st !== "out").sort((a, b) => (a.h.km ?? a.dist) - (b.h.km ?? b.dist))[0] || null;
+    placeLabels();
+  }
+  function placeLabels() {
+    const d = S.data; if (!d) return;
+    const placed = [], pr = panel.getBoundingClientRect();
+    $$(".hud", panel).forEach(e => { const r = e.getBoundingClientRect(); if (r.width && r.height) placed.push({ x: (r.left - pr.left) * DPR, y: (r.top - pr.top) * DPR, w: r.width * DPR, h: r.height * DPR }); });
+    const ob = (x, y, r) => placed.push({ x: x - r, y: y - r, w: r * 2, h: r * 2 });
+    ob(cx, cy, 16 * DPR); S.nodes.forEach(n => ob(n.x, n.y, (n.h.rank ? 10 : 6) * DPR));
+    ctx.font = "700 " + 12 * DPR + "px " + FONT;
+    const ot = d.origin.name.length > 18 ? d.origin.name.slice(0, 17) + "…" : d.origin.name, tx = 50 * DPR, ow = tx + ctx.measureText(ot).width + 10 * DPR, oh = 24 * DPR;
+    const OL = { x: cx - ow / 2, y: cy - 44 * DPR - oh, w: ow, h: oh, txt: ot, tx };
+    if (S.nodes.some(n => Math.abs(n.x - cx) < ow / 2 + 8 * DPR && n.y > OL.y - 8 * DPR && n.y < OL.y + oh + 8 * DPR)) OL.y = cy + 40 * DPR;
+    S.originLab = OL; placed.push(OL);
+    const nr = S.nearest;
+    if (nr && nr.h.rank !== 1) {
+      ctx.font = "700 " + 10 * DPR + "px " + FONT;
+      const txt = "직선 최단" + (nr.h.km != null ? " " + nr.h.km + "km" : ""), w = ctx.measureText(txt).width, dx = nr.x - cx, dy = nr.y - cy, L = Math.hypot(dx, dy) || 1, ox = -dy / L * 14 * DPR, oy = dx / L * 14 * DPR;
+      S.nearestLab = { txt, x: (cx + nr.x) / 2 + ox - (ox < 0 ? w : 0), y: (cy + nr.y) / 2 + oy };
+      placed.push({ x: S.nearestLab.x, y: S.nearestLab.y - 7 * DPR, w, h: 14 * DPR });
+    }
+    const prio = n => n.h.rank ? n.h.rank : 10 + ST_ORDER[n.h.st];
+    S.nodes.slice().sort((a, b) => prio(a) - prio(b) || a.dist - b.dist).forEach(n => {
+      const big = !!n.h.rank, fs = (big ? 12.5 : 11) * DPR, font = (big ? 700 : 500) + " " + fs + "px " + FONT;
+      ctx.font = font;
+      const txt = n.h.short + (n.h.min != null && n.h.st !== "out" ? "  " + n.h.min + "분" : ""), w = ctx.measureText(txt).width, hh = fs * 1.3, g = (big ? 17 : 10) * DPR;
+      const C = [[g, -hh / 2], [-g - w, -hh / 2], [-w / 2, -g - hh], [-w / 2, g], [g * .8, -hh - g * .4], [g * .8, g * .4], [-g * .8 - w, -hh - g * .4], [-g * .8 - w, g * .4]];
+      let best = null;
+      for (const [ox, oy] of C) { const r = { x: n.x + ox, y: n.y + oy, w, h: hh }; if (r.x < 6 * DPR || r.x + w > W - 6 * DPR || r.y < 6 * DPR || r.y + hh > H - 6 * DPR) continue; if (placed.some(q => hit(q, r))) continue; best = r; break; }
+      if (!best && big) best = { x: clamp(n.x + g, 6 * DPR, W - w - 6 * DPR), y: n.y - hh / 2, w, h: hh };
+      n.lab = best ? Object.assign(best, { txt, font }) : null; if (best) placed.push(best);
+    });
+  }
+
+  function tip(i) {
+    const n = S.nodes.find(x => x.h.i === i);
+    if (!n) { tipEl.hidden = true; return; }
+    const x = n.h; tipEl.replaceChildren(h("b", "t", x.name));
+    const dl = h("dl"), add = (k, v) => { if (v != null && v !== "") dl.append(h("dt", null, k), h("dd", null, v)); };
+    add("판정", ST_TXT[x.st] + (x.rank ? " · " + x.rank + "순위" : ""));
+    add("예상 소요", x.min != null ? x.min + "분 · 실시간 교통" : null);
+    add("도로 거리", x.road != null ? x.road + "km" : null);
+    add("직선 거리", x.km != null ? x.km + "km" : null);
+    add("가용 병상", x.beds != null ? x.beds + (x.time ? " · " + x.time + " 기준" : "") : null);
+    add("응급실", x.tel);
+    tipEl.append(dl); if (x.note) tipEl.append(h("p", null, x.note));
+    tipEl.hidden = false;
+    const pw = panel.clientWidth, ph = panel.clientHeight, tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+    let L = n.x / DPR + 20; if (L + tw > pw - 10) L = n.x / DPR - 20 - tw;
+    tipEl.style.left = clamp(L, 10, Math.max(10, pw - tw - 10)) + "px"; tipEl.style.top = clamp(n.y / DPR - th / 2, 10, Math.max(10, ph - th - 10)) + "px";
+  }
+  function pickAt(e) { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * DPR, y = (e.clientY - r.top) * DPR; let best = -1, bd = 24 * DPR; for (const n of S.nodes) { const d = Math.hypot(n.x - x, n.y - y); if (d < bd) { bd = d; best = n.h.i; } } return best; }
+  cv.addEventListener("pointermove", e => { if (e.pointerType !== "mouse" || !S.nodes.length) return; const i = pickAt(e); if (i !== S.hov) { S.hov = i; cv.style.cursor = i >= 0 ? "pointer" : ""; tip(i >= 0 ? i : S.sel); } });
+  cv.addEventListener("pointerleave", () => { S.hov = -1; cv.style.cursor = ""; tip(S.sel); });
+  cv.addEventListener("click", e => { if (!S.nodes.length) return; const i = pickAt(e); S.sel = i; tip(i); if (S.pick) S.pick(i); });
+
+  function resize() {
+    const r = panel.getBoundingClientRect(), w = Math.max(240, r.width), hh = Math.max(240, r.height);
+    DPR = Math.min(window.devicePixelRatio || 1, w * hh > 640000 ? 1.5 : 2);
+    W = cv.width = Math.round(w * DPR); H = cv.height = Math.round(hh * DPR);
+    cx = W / 2; cy = H / 2 + (w > 700 ? 14 : 6) * DPR; Rh = Math.min(W, H) * (w > 700 ? .42 : .44);
+    gridC = null; if (S.data) layout(); if (S.sel >= 0) tip(S.sel);
+    if (REDUCED) draw(now());
+  }
+  function draw(t) {
+    const dt = Math.min(64, t - last); last = t; runTweens(t);
+    if (G.spin) G.lon0 += dt * .00011;
+    RD.sweep = (RD.sweep + dt * (S.data ? .0007 : .0024)) % TAU;
+    ctx.globalAlpha = 1; ga = 1; ctx.clearRect(0, 0, W, H);
+    drawGlobe(t); drawRing(t); drawRadar(t);
+  }
+  function loop(t) { draw(t); raf = requestAnimationFrame(loop); }
+  function start() { if (!raf && !REDUCED) raf = requestAnimationFrame(loop); }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else start(); });
+  new ResizeObserver(() => resize()).observe(panel);
+  resize(); start();
+  if (REDUCED) setInterval(() => draw(now()), 500);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => placeLabels());
+
+  function reveal(d) {
+    tweens.length = 0; S.data = d; S.mode = "result"; S.revealAt = now(); S.stage = 6; S.sel = S.hov = -1; tip(-1);
+    if (G.alpha > .01) tween(G, "alpha", 0, 500); if (RD.alpha < 1) tween(RD, "alpha", 1, 500); tween(RD, "lab", 1, 700, E.out, 250);
+    layout();
+  }
+  function locate() {
+    tweens.length = 0; clearTimeout(S.tm);
+    Object.assign(S, { mode: "locate", data: null, queued: null, sel: -1, hov: -1, stage: 1 }); layout(); tip(-1); RD.lab = 0; G.spin = 0;
+    let p0 = 0;
+    if (G.alpha < .6 || G.zoom > 1.2) { p0 = 650; tween(RD, "alpha", 0, 450, E.out); if (G.zoom > 1.2) G.zoom = 1.8; tween(G, "zoom", 1, 650, E.out); tween(G, "alpha", 1, 500, E.out); }
+    const tl = 127.8 * D2R, dl = ((((tl - G.lon0) % TAU) + TAU * 1.5) % TAU) - Math.PI;
+    tween(G, "lon0", G.lon0 + dl, 1300, E.inOut, p0); tween(G, "lat0", 36.2 * D2R, 1300, E.inOut, p0); tween(G, "hi", 1, 500, E.out, p0 + 800);
+    tween(G, "zoom", 4.6, 1000, E.in, p0 + 1400); tween(G, "alpha", 0, 800, E.in, p0 + 1600); tween(RD, "alpha", 1, 800, E.out, p0 + 1700);
+    S.locateEnd = now() + (REDUCED ? 0 : p0 + 2500);
+    S.tm = setTimeout(() => { if (S.mode !== "locate") return; S.mode = "scan"; if (S.queued) { const q = S.queued; S.queued = null; reveal(q); } }, Math.max(0, S.locateEnd - now()));
+  }
+  function setData(d) { const wait = S.mode === "locate" ? Math.max(0, S.locateEnd - now()) : 0; if (wait > 0) S.queued = d; else reveal(d); return wait + revealDur(d); }
+  function reset() {
+    tweens.length = 0; clearTimeout(S.tm);
+    Object.assign(S, { mode: "idle", data: null, queued: null, sel: -1, hov: -1, stage: 0 }); layout(); tip(-1);
+    tween(RD, "alpha", 0, 500); tween(RD, "lab", 0, 300); if (G.zoom > 1.2) G.zoom = 2.2; tween(G, "zoom", 1, 1100, E.out); tween(G, "alpha", 1, 900, E.out, 150); tween(G, "hi", 0, 600); G.spin = 1;
+  }
+  return {
+    locate, setData, reset,
+    setStage: s => { S.stage = s; },
+    select: i => { S.sel = i; tip(i); },
+    hover: i => { S.hov = i; tip(i >= 0 ? i : S.sel); },
+    onPick: f => { S.pick = f; }
+  };
+})();
+
+// 파이프라인: 워크플로 단계를 평균 소요 시간 기준으로 보여 줍니다(예상 진행).
+const Pipe = (() => {
+  const li = $$("#stages li"), elapsed = $("#elapsed"), note = $("#pipeNote");
+  const T = [0, 3200, 6200, 10800, 14800];
+  let t0 = 0, k = 1, timer = 0, cur = -1, onStage = () => { };
+  function set(s) { li.forEach((x, j) => { x.className = j < s ? "done" : j === s ? "on" : ""; x.querySelector("em").textContent = j < s ? "완료" : j === s ? "진행 중" : ""; }); }
+  function tick() {
+    const e = now() - t0; elapsed.textContent = "T+" + fmtT(e);
+    let s = 0; T.forEach((v, j) => { if (e >= v * k) s = j; });
+    if (s !== cur) { cur = s; set(s); onStage(s + 1); }
+    if (s === 4 && e > 25000 * k) note.textContent = "AI가 후보의 병상·수용 제한·이동 시간을 비교하는 중이에요. 보통 30~60초 걸립니다.";
+  }
+  function start(demo) { t0 = now(); k = demo ? .4 : 1; cur = -1; note.textContent = "단계 표시는 평균 소요 시간을 바탕으로 한 예상 진행입니다."; clearInterval(timer); tick(); timer = setInterval(tick, 200); }
+  function finish(ok, msg) {
+    clearInterval(timer); timer = 0; const e = now() - t0; elapsed.textContent = "T+" + fmtT(e);
+    if (ok) { set(5); note.textContent = msg || "총 " + Math.round(e / 1000) + "초 · 워크플로가 모은 실시간 데이터로 판단했어요."; }
+    else { set(-1); note.textContent = msg || "워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다."; }
+  }
+  return { start, finish, onStage: f => { onStage = f; } };
+})();
+
+const Ticker = (() => {
+  const el = $("#tick");
+  function fill(items) {
+    el.replaceChildren();
+    for (let r = 0; r < 2; r++) items.forEach(([k, v]) => { const s = h("span"); s.append(h("b", null, k), document.createTextNode(v)); el.append(s); });
+    const len = items.reduce((n, it) => n + it.join(" ").length, 0);
+    el.style.setProperty("--dur", Math.max(28, len * .3) + "s");
+  }
+  return {
+    idle: () => fill([["STANDBY", "장소와 환자 상황을 보내면 주변 응급실 10곳을 분석합니다"], ["DATA", "국립중앙의료원 응급의료정보 · 카카오 로컬 · 카카오모빌리티 길찾기"], ["AGENT", "Copilot Studio 에이전트 · Claude Opus 5.5"], ["LINK", "agent-seal 봉인 · Direct Line · GitHub Pages"]]),
+    scan: t => fill([["REQUEST", t], ["FLOW", "장소 좌표 → 후보 응급실 10곳 → 실시간 병상·수용 제한 → 도로 이동 시간 → AI 판단"], ["NOTE", "판단까지 보통 30~60초 걸립니다"]]),
+    result: d => fill(d.hs.slice().sort((a, b) => (a.min ?? 999) - (b.min ?? 999)).map(x => [x.short, [x.min != null ? x.min + "분" : null, x.beds != null ? "병상 " + x.beds : null, x.time ? x.time + " 갱신" : null, ST_TXT[x.st]].filter(Boolean).join(" · ")]))
+  };
+})();
+
+// 순위판: 상위 3곳 카드 + 후보 전체 도착 시간 비교
+const Rank = (() => {
+  const top3 = $("#top3"), bars = $("#bars"), needEl = $("#need"), insight = $("#insight"), rankTime = $("#rankTime");
+  const ICON = {
+    tel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>',
+    route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg>'
+  };
+  let pickCb = () => { }, hoverCb = () => { };
+  function empty() {
+    needEl.hidden = true; insight.hidden = true; rankTime.textContent = "";
+    top3.replaceChildren(h("div", "empty", "장소와 환자 상황을 보내면 응급실 상위 3곳이 여기에 나타나요."));
+    bars.replaceChildren(h("li", "bar-empty", "후보 응급실의 도착 시간을 한눈에 비교합니다."));
+  }
+  function scanning() {
+    needEl.hidden = true; insight.hidden = true; rankTime.textContent = "ANALYZING";
+    top3.replaceChildren(...[1, 2, 3].map(k => { const s = h("div", "skel"); s.style.setProperty("--d", k * 120 + "ms"); s.append(h("span", "skel-no", String(k)), h("span", "skel-l")); return s; }));
+    bars.replaceChildren(...Array.from({ length: 6 }, (_, k) => { const x = h("li", "skel-bar"); x.style.setProperty("--d", k * 90 + "ms"); return x; }));
+  }
+  function metric(cls, key, v, unit, cap) {
+    const m = h("div", "m" + (cls ? " " + cls : "")), b = h("b", null, v == null ? "–" : "0"); m.append(h("span", "k", key));
+    if (v != null) b.dataset.to = v; m.append(b); if (unit && v != null) m.append(h("small", null, unit)); m.append(h("em", null, cap)); return m;
+  }
+  function countUp(root, delay) {
+    $$("b[data-to]", root).forEach(b => {
+      const to = parseFloat(b.dataset.to), dec = (String(b.dataset.to).split(".")[1] || "").length, t0 = now() + delay;
+      if (REDUCED) { b.textContent = to.toFixed(dec); return; }
+      const step = t => { const p = clamp((t - t0) / 900, 0, 1); b.textContent = (to * E.out(p)).toFixed(dec); if (p < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+  }
+  function bind(el, i) { el.addEventListener("click", e => { if (e.target.closest("a")) return; pickCb(i); }); el.addEventListener("keydown", e => { if (e.key === "Enter") pickCb(i); }); el.addEventListener("mouseenter", () => hoverCb(i)); el.addEventListener("mouseleave", () => hoverCb(-1)); }
+  function render(d, delay) {
+    const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), D = Math.max(0, delay * .55);
+    const times = d.hs.map(x => x.time).filter(Boolean).sort(); rankTime.textContent = times.length ? times[times.length - 1] + " 기준" : "";
+    if (d.need) { needEl.replaceChildren(h("b", null, "필요한 치료 · "), document.createTextNode(d.need)); needEl.hidden = false; } else needEl.hidden = true;
+    top3.replaceChildren();
+    if (!recs.length) top3.append(h("div", "empty", "조건에 맞는 병원을 찾지 못했어요. 브리핑의 보류·제외 이유를 확인하세요."));
+    const maxBeds = Math.max(1, ...d.hs.map(x => x.beds || 0));
+    recs.forEach((x, k) => {
+      const c = h("article", "card r" + x.rank); c.style.setProperty("--d", D + k * 140 + "ms"); c.dataset.i = x.i; c.tabIndex = 0;
+      const left = h("div", "card-rank"); left.append(h("span", "no", String(x.rank)), h("span", "lbl", "RANK"));
+      const main = h("div", "card-main"); main.append(h("h3", null, x.name));
+      const mt = h("div", "metrics");
+      mt.append(metric("eta", "ETA", x.min, "분", "실시간 교통"), metric("", "BEDS", x.beds, "", x.time ? x.time + " 기준" : "가용 병상"), metric("", x.road != null ? "ROAD" : "DIST", x.road ?? x.km, "km", x.road != null && x.km != null ? "직선 " + x.km + "km" : "직선 거리"));
+      main.append(mt);
+      const bb = h("div", "bedbar"), bi = h("i"); bi.style.setProperty("--w", Math.round((x.beds || 0) / maxBeds * 100) + "%"); bb.append(bi); main.append(bb);
+      if (x.note) main.append(h("p", "note", x.note));
+      const act = h("div", "act");
+      if (x.tel) { const a = h("a", "abtn"); a.href = "tel:" + x.tel.replace(/[^0-9+]/g, ""); a.innerHTML = ICON.tel; a.append(document.createTextNode(x.tel)); act.append(a); }
+      if (x.lat != null && x.lng != null) { const a = h("a", "abtn"); a.href = "https://map.kakao.com/link/to/" + encodeURIComponent(x.name) + "," + x.lat + "," + x.lng; a.target = "_blank"; a.rel = "noopener"; a.innerHTML = ICON.route; a.append(document.createTextNode("카카오맵 길안내")); act.append(a); }
+      if (act.children.length) main.append(act);
+      c.append(left, main); top3.append(c); bind(c, x.i);
+    });
+    countUp(top3, D + 200);
+    const best = recs[0], near = d.hs.filter(x => x.km != null && x.st !== "out").sort((a, b) => a.km - b.km)[0];
+    if (best && near && near !== best && near.min != null && best.min != null) {
+      const diff = near.min - best.min, jo = hasJong(near.short) ? "은" : "는";
+      insight.replaceChildren(h("b", null, "직선 최단 ≠ 최단 시간"), h("br"), document.createTextNode(near.short + jo + " 직선 " + near.km + "km로 가장 가깝지만 도로로 " + (near.road != null ? near.road + "km · " : "") + near.min + "분 걸려요. " + (diff > 0 ? "1순위 " + best.short + "보다 " + diff + "분 늦습니다." : "도착 시간은 비슷하지만 병상·수용 조건에서 순위가 갈렸어요.")));
+      insight.hidden = false;
+    } else insight.hidden = true;
+    bars.replaceChildren();
+    const order = d.hs.slice().sort((a, b) => (a.rank || 99) - (b.rank || 99) || ST_ORDER[a.st] - ST_ORDER[b.st] || (a.min ?? 999) - (b.min ?? 999));
+    const maxMin = Math.max(1, ...d.hs.map(x => x.min || 0));
+    order.forEach((x, k) => {
+      const li = h("li", "bar st-" + x.st); li.dataset.i = x.i; li.tabIndex = 0; li.style.setProperty("--d", D + 300 + k * 70 + "ms");
+      const nm = h("span", "nm", x.short); if (x.rank) nm.prepend(h("span", "rk", String(x.rank))); if (near && x === near && x !== best) nm.append(h("small", null, "직선 최단"));
+      const tr = h("span", "track"), bi = h("i"); bi.style.setProperty("--w", x.min != null ? Math.max(4, x.min / maxMin * 100) + "%" : "0%"); tr.append(bi);
+      const sub = [ST_TXT[x.st], x.beds != null ? "병상 " + x.beds : null, x.km != null ? "직선 " + x.km + "km" : null, x.note || null].filter(Boolean).join(" · ");
+      li.append(h("span", "dot"), nm, tr, h("span", "v", x.min != null ? x.min + "분" : "–"), h("span", "sub", sub)); li.title = x.name + " — " + sub;
+      bars.append(li); bind(li, x.i);
+    });
+  }
+  function select(i, scroll) {
+    $$(".card, .bar", $("#rank")).forEach(e => e.classList.toggle("is-sel", Number(e.dataset.i) === i && i >= 0));
+    if (scroll && i >= 0 && !MOBILE()) { const e = $('.card[data-i="' + i + '"]', $("#rank")) || $('.bar[data-i="' + i + '"]', $("#rank")); if (e) e.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  }
+  return { empty, scanning, render, select, onPick: f => { pickCb = f; }, onHover: f => { hoverCb = f; } };
+})();
+
+const DEMO = { data: {"origin":{"name":"보라매공원","address":"서울 동작구 신대방동 722","lat":37.493280643072396,"lng":126.92051428564939},"need":"일반 응급(MKioskTy28) – 다리 골절, 해당 중증질환 항목 없음","hospitals":[{"rank":1,"status":"추천","name":"한림대학교 강남성심병원","lat":37.493243842312545,"lng":126.90866355867689,"km":1.05,"road":1.4,"min":4,"beds":8,"time":"20:41","tel":"02-829-5114","note":"제한 없음, 가장 빠름"},{"rank":2,"status":"추천","name":"대림성모병원","lat":37.49068901587815,"lng":126.90716283591561,"km":1.21,"road":1.7,"min":6,"beds":7,"time":"20:40","tel":"02-829-9000","note":"제한 없음, 두 번째로 빠름"},{"rank":3,"status":"추천","name":"성애의료재단성애병원","lat":37.512048270393805,"lng":126.92235924751729,"km":2.09,"road":2.3,"min":9,"beds":13,"time":"20:43","tel":"02-840-7114","note":"제한 없음, 세 번째로 빠름"},{"rank":0,"status":"대안","name":"명지성모병원","lat":37.49385027179074,"lng":126.89924603567025,"km":1.88,"road":2.5,"min":9,"beds":6,"time":"20:45","tel":"02-1899-1475","note":"조건 충족, 549초로 4위"},{"rank":0,"status":"대안","name":"서울특별시보라매병원","lat":37.49371834838055,"lng":126.92404755555235,"km":0.32,"road":2.6,"min":9,"beds":18,"time":"20:45","tel":"02-870-2114","note":"최근접·병상 최다, 560초"},{"rank":0,"status":"대안","name":"가톨릭대학교 여의도성모병원","lat":37.51826955419788,"lng":126.93672682810558,"km":3.13,"road":3.8,"min":13,"beds":11,"time":"20:45","tel":"1661-7575","note":"조건 충족, 13분"},{"rank":0,"status":"대안","name":"씨엠병원","lat":37.51884139054663,"lng":126.90367542781709,"km":3.21,"road":4.1,"min":15,"beds":8,"time":"20:45","tel":"02-2678-0001","note":"조건 충족, 15분"},{"rank":0,"status":"대안","name":"고려대학교의과대학부속구로병원","lat":37.492110358092134,"lng":126.88474046023177,"km":3.16,"road":4.5,"min":17,"beds":1,"time":"20:43","tel":"02-2626-1114","note":"가장 멂, 병상 1"},{"rank":0,"status":"보류","name":"의료법인서울효천의료재단 에이치플러스양지병원","lat":37.4842711870398,"lng":126.93252770303516,"km":1.46,"road":3.2,"min":11,"beds":8,"time":"20:45","tel":"02-1877-8875","note":"응급실 불가 메시지 11/8~11/14"},{"rank":0,"status":"제외","name":"강남힐병원","lat":37.4816478504812,"lng":126.91164761293011,"km":1.51,"road":2.4,"min":9,"beds":null,"time":null,"tel":null,"note":"수용·병상 정보 없음"}]}, md: "**🚑 이송 추천** · 필요한 치료: 일반 응급(MKioskTy28 응급실). 다리 골절에 해당하는 중증질환 항목이 없어 일반 응급으로 판단했습니다. 쇼크, 개방성 골절, 다발성 외상이 있으면 중증외상이므로 권역외상센터로 이송해야 합니다.\n📍 기준 위치: 보라매공원 (서울 동작구 신대방동 722)\n\n**1순위 한림대학교 강남성심병원**\n- 예상 4분(실시간 교통) · 거리 1.05km · 응급실 가용병상 8(20:41 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 가장 짧습니다.\n- ☎ 02-829-5114 · [지도](https://map.kakao.com/link/to/한림대학교 강남성심병원,37.493243842312545,126.90866355867689)\n\n**2순위 대림성모병원**\n- 예상 6분(실시간 교통) · 거리 1.21km · 응급실 가용병상 7(20:40 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 두 번째로 짧습니다.\n- ☎ 02-829-9000 · [지도](https://map.kakao.com/link/to/대림성모병원,37.49068901587815,126.90716283591561)\n\n**3순위 성애의료재단성애병원**\n- 예상 9분(실시간 교통) · 거리 2.09km · 응급실 가용병상 13(20:43 기준)\n- 근거: 응급실 수용 가능(Y)이고 제한 메시지가 없으며 소요시간이 세 번째로 짧습니다(523초).\n- ☎ 02-840-7114 · [지도](https://map.kakao.com/link/to/성애의료재단성애병원,37.512048270393805,126.92235924751729)\n\nℹ️ 직선거리로는 서울특별시보라매병원(0.32km)이 가장 가깝지만, 도로로는 2.6km에 9분(560초)이 걸려 소요시간 순위는 5위입니다. 가용병상이 18로 가장 많아 1순위 대안입니다. 그다음 대안은 명지성모병원 9분(549초), 가톨릭대학교 여의도성모병원 13분, 씨엠병원 15분, 고려대학교의과대학부속구로병원 17분(병상 1) 순입니다.\n\n**보류** 에이치플러스양지병원 – 응급실 수용 제한 메시지 '불가능메세지등록'(기타 진료과, 2026-11-08 00:00~2026-11-14 23:59) · 예상 11분. 전화로 수용이 확인돼도 상위 3곳보다 늦어 대안으로만 쓸 수 있습니다.\n**제외** 강남힐병원 – 중증질환 수용 정보와 실시간 병상 목록에 없음\n⚠️ 병상과 메시지는 병원이 입력한 값이라 실제와 다를 수 있습니다. 출발 전 전화로 수용을 확인하세요.\n_연구용 시뮬레이션 – 실제 이송 판단에 쓰지 않습니다._\n\n```json\n{\"origin\":{\"name\":\"보라매공원\",\"address\":\"서울 동작구 신대방동 722\",\"lat\":37.493280643072396,\"lng\":126.92051428564939},\"need\":\"일반 응급(MKioskTy28) – 다리 골절, 해당 중증질환 항목 없음\",\"hospitals\":[\n{\"rank\":1,\"status\":\"추천\",\"name\":\"한림대학교 강남성심병원\",\"lat\":37.493243842312545,\"lng\":126.90866355867689,\"km\":1.05,\"road\":1.4,\"min\":4,\"beds\":8,\"time\":\"20:41\",\"tel\":\"02-829-5114\",\"note\":\"제한 없음, 가장 빠름\"},\n{\"rank\":2,\"status\":\"추천\",\"name\":\"대림성모병원\",\"lat\":37.49068901587815,\"lng\":126.90716283591561,\"km\":1.21,\"road\":1.7,\"min\":6,\"beds\":7,\"time\":\"20:40\",\"tel\":\"02-829-9000\",\"note\":\"제한 없음, 두 번째로 빠름\"},\n{\"rank\":3,\"status\":\"추천\",\"name\":\"성애의료재단성애병원\",\"lat\":37.512048270393805,\"lng\":126.92235924751729,\"km\":2.09,\"road\":2.3,\"min\":9,\"beds\":13,\"time\":\"20:43\",\"tel\":\"02-840-7114\",\"note\":\"제한 없음, 세 번째로 빠름\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"명지성모병원\",\"lat\":37.49385027179074,\"lng\":126.89924603567025,\"km\":1.88,\"road\":2.5,\"min\":9,\"beds\":6,\"time\":\"20:45\",\"tel\":\"02-1899-1475\",\"note\":\"조건 충족, 549초로 4위\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"서울특별시보라매병원\",\"lat\":37.49371834838055,\"lng\":126.92404755555235,\"km\":0.32,\"road\":2.6,\"min\":9,\"beds\":18,\"time\":\"20:45\",\"tel\":\"02-870-2114\",\"note\":\"최근접·병상 최다, 560초\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"가톨릭대학교 여의도성모병원\",\"lat\":37.51826955419788,\"lng\":126.93672682810558,\"km\":3.13,\"road\":3.8,\"min\":13,\"beds\":11,\"time\":\"20:45\",\"tel\":\"1661-7575\",\"note\":\"조건 충족, 13분\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"씨엠병원\",\"lat\":37.51884139054663,\"lng\":126.90367542781709,\"km\":3.21,\"road\":4.1,\"min\":15,\"beds\":8,\"time\":\"20:45\",\"tel\":\"02-2678-0001\",\"note\":\"조건 충족, 15분\"},\n{\"rank\":0,\"status\":\"대안\",\"name\":\"고려대학교의과대학부속구로병원\",\"lat\":37.492110358092134,\"lng\":126.88474046023177,\"km\":3.16,\"road\":4.5,\"min\":17,\"beds\":1,\"time\":\"20:43\",\"tel\":\"02-2626-1114\",\"note\":\"가장 멂, 병상 1\"},\n{\"rank\":0,\"status\":\"보류\",\"name\":\"의료법인서울효천의료재단 에이치플러스양지병원\",\"lat\":37.4842711870398,\"lng\":126.93252770303516,\"km\":1.46,\"road\":3.2,\"min\":11,\"beds\":8,\"time\":\"20:45\",\"tel\":\"02-1877-8875\",\"note\":\"응급실 불가 메시지 11/8~11/14\"},\n{\"rank\":0,\"status\":\"제외\",\"name\":\"강남힐병원\",\"lat\":37.4816478504812,\"lng\":126.91164761293011,\"km\":1.51,\"road\":2.4,\"min\":9,\"beds\":null,\"time\":null,\"tel\":null,\"note\":\"수용·병상 정보 없음\"}\n]}\n```", text: "보라매공원, 50대 다리골절 노인", at: "2026-11-10 20:45 실데이터 기록" };
+const EXAMPLES = ["보라매공원, 50대 다리골절 노인", "강남역, 60대 남성 갑작스러운 가슴 통증", "잠실 롯데월드, 7살 아이 열성 경련", "광화문광장, 70대 여성 한쪽 팔다리 마비"];
+const STAGE_HUD = [null, ["LOCATING", "카카오 장소 검색으로 좌표를 찾는 중"], ["SCANNING ER", "주변 응급실 후보 10곳을 찾는 중"], ["LIVE BEDS", "가용병상·중증질환 수용·제한 메시지 확인 중"], ["ROUTING", "실시간 교통으로 도로 이동 시간 계산 중"], ["AI DECISION", "Claude Opus 5.5가 순위를 판단하는 중"]];
+const App = { store: null, connected: false, turn: null, data: null, demo: false, timer: 0 };
+const q = $("#q"), sendBtn = $("#send"), chipsEl = $("#chips"), noticeEl = $("#notice");
+
+const Boot = (() => {
+  const el = $("#boot"), log = $("#bootLog"); let done = false;
+  const line = (txt, cls) => log.append(h("div", cls || null, txt));
+  function close(delay) { if (done) return; done = true; setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 700); }, delay || 0); }
+  if (REDUCED || /[?&]demo/.test(location.search)) { el.remove(); done = true; }
+  else { line("> GOLDEN TIME ROUTER // HOLO HUD"); setTimeout(() => line("> 응급의료 데이터 링크 준비"), 250); setTimeout(() => line("> 에이전트 토큰 요청 · agent-seal broker"), 500); setTimeout(() => close(), 3400); el.addEventListener("click", () => close()); }
+  return { ok: () => { if (done) return; line("> Direct Line 연결 완료 · 대기", "ok"); close(650); }, fail: m => { if (done) return; line("> 연결 실패 · " + m, "bad"); line("> 샘플 시연으로 화면을 볼 수 있어요", "bad"); close(1400); } };
+})();
+
+function setHud(state, sub) { $("#hudState").textContent = state; if (sub != null) $("#hudSub").textContent = sub; }
+function setCoord(o) { const c = $("#hudCoord"); c.replaceChildren(h("span", null, "ORIGIN"), h("b", null, o && o.lat != null ? o.lat.toFixed(4) + "° N" : "--.----° N"), h("b", null, o && o.lng != null ? o.lng.toFixed(4) + "° E" : "---.----° E")); }
+function setMeta(t) { $("#hudMeta").textContent = t; }
+function setLink(state, text) { document.body.classList.toggle("is-connected", state === "on"); document.body.classList.toggle("is-error", state === "err"); $("#linkText").textContent = text; }
+function busy() { return !!(App.turn && !App.turn.paused); }
+function refresh() { sendBtn.disabled = !q.value.trim() || !App.connected || busy(); $$(".chip", chipsEl).forEach(c => { c.disabled = busy(); }); $("#demoBtn").disabled = busy(); }
+function autosize() { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 132) + "px"; }
+function scrollToEl(el) { window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 10, behavior: REDUCED ? "auto" : "smooth" }); }
+function showChat(demo) { $("#webchat").hidden = demo; $("#demoBrief").hidden = !demo; }
+
+function renderChips() {
+  chipsEl.replaceChildren(...EXAMPLES.map(t => { const b = h("button", "chip", t); b.type = "button"; b.addEventListener("click", () => { if (App.connected) submit(t); else { q.value = t; autosize(); refresh(); q.focus(); } }); return b; }));
+}
+function renderSuggested(list) {
+  $$(".chip.sa", chipsEl).forEach(x => x.remove());
+  (list || []).slice(0, 4).reverse().forEach(a => { const b = h("button", "chip sa", a.title || a.value || ""); b.type = "button"; b.addEventListener("click", () => { if (a.type === "openUrl" && a.value) window.open(a.value, "_blank", "noopener"); else submit(String(a.value || a.title || "")); }); chipsEl.prepend(b); });
+}
+function showOffline(err) {
+  const local = !/\.github\.io$/.test(location.hostname);
+  const b1 = h("button", "abtn", "샘플 시연 보기"); b1.type = "button"; b1.addEventListener("click", runDemo);
+  const row = h("div", "row"); row.append(b1);
+  if (!local) { const b2 = h("button", "abtn", "다시 시도"); b2.type = "button"; b2.addEventListener("click", () => location.reload()); row.append(b2); }
+  noticeEl.replaceChildren(h("b", null, local ? "이 페이지는 내 github.io 주소에서만 에이전트와 연결돼요." : "지금은 에이전트와 연결할 수 없어요."), document.createTextNode(local ? " 내 컴퓨터나 AI 도구 미리보기에서 연결되지 않는 것은 정상이에요. 샘플 시연으로 화면을 먼저 볼 수 있어요." : " 잠시 뒤 다시 시도하거나 샘플 시연으로 화면을 확인하세요."));
+  if (err) noticeEl.append(h("code", null, String(err)));
+  noticeEl.append(row); noticeEl.hidden = false;
+}
+
+function submit(text) {
+  text = String(text == null ? q.value : text).trim();
+  if (!text || busy()) return;
+  if (!App.connected || !App.store) { showOffline(); return; }
+  if (App.demo) { App.demo = false; showChat(false); }
+  App.store.dispatch({ type: "WEB_CHAT/SEND_MESSAGE", payload: { text } });
+  q.value = ""; autosize(); renderSuggested([]); beginTurn(text, false);
+}
+function beginTurn(text, demo) {
+  App.turn = { text, demo, paused: false }; App.data = null;
+  document.body.classList.add("is-working"); document.body.classList.remove("is-result");
+  FX.boost(true); Holo.locate(); Pipe.start(demo); Rank.scanning(); Ticker.scan(text); setCoord(null);
+  setMeta("NODES 00 · " + (demo ? "SAMPLE" : "LIVE") + " SCAN");
+  clearTimeout(App.timer); if (!demo) App.timer = setTimeout(() => endTurn(), 180000);
+  refresh(); if (MOBILE()) scrollToEl($("#holoPanel"));
+  say("분석을 시작했어요. " + text);
+}
+function pauseTurn() {
+  const t = App.turn; if (!t || t.paused) return;
+  t.paused = true; clearTimeout(App.timer);
+  document.body.classList.remove("is-working"); FX.boost(false);
+  Pipe.finish(false, "에이전트가 먼저 답했어요. 질문이 있다면 브리핑을 보고 답해 주세요.");
+  Holo.reset(); Rank.empty(); Ticker.idle(); setMeta("NODES 00 · STANDBY");
+  setHud("AWAITING INPUT", "에이전트의 답을 아래 브리핑에서 확인하세요"); refresh();
+  say("에이전트가 답했어요. 브리핑을 확인하세요.");
+}
+function resumeTurn() {
+  const t = App.turn; if (!t || !t.paused) return;
+  t.paused = false; document.body.classList.add("is-working"); FX.boost(true);
+  Holo.locate(); Pipe.start(t.demo); Rank.scanning(); Ticker.scan(t.text); refresh();
+  clearTimeout(App.timer); App.timer = setTimeout(() => endTurn(), 180000);
+}
+function endTurn() {
+  if (!App.turn) return; App.turn = null; clearTimeout(App.timer);
+  document.body.classList.remove("is-working"); FX.boost(false);
+  Pipe.finish(false, "응답이 없어요. 새 대화를 눌러 다시 시도해 주세요."); Holo.reset(); Rank.empty(); Ticker.idle();
+  setHud("NO RESPONSE", "응답이 너무 늦어요. 새 대화로 다시 시도해 주세요."); refresh();
+}
+function showResult(d) {
+  const t = App.turn; clearTimeout(App.timer); App.turn = null; App.data = d;
+  document.body.classList.remove("is-working"); document.body.classList.add("is-result"); FX.boost(false);
+  const total = Holo.setData(d);
+  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + DEMO.at : null); Rank.render(d, total); Ticker.result(d); setCoord(d.origin);
+  const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), best = recs[0];
+  setMeta("NODES " + pad2(d.hs.filter(x => x.lat != null && x.lng != null).length) + " · RANKED " + recs.length + (t && t.demo ? " · SAMPLE" : " · LIVE"));
+  setHud("ROUTE LOCKED", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
+  if (best && !REDUCED) setTimeout(() => {
+    const lock = $("#lock"); $("#lockName").textContent = best.name; $("#lockEta").textContent = (best.min != null ? "ETA " + best.min + " MIN" : "") + (best.beds != null ? " · BEDS " + best.beds : "");
+    lock.hidden = false; lock.style.animation = "none"; void lock.offsetWidth; lock.style.animation = ""; setTimeout(() => { lock.hidden = true; }, 2900);
+  }, total);
+  refresh(); say(best ? "추천 결과: 1순위 " + best.name + (best.min != null ? ", 예상 " + best.min + "분" : "") : "조건에 맞는 병원을 찾지 못했어요");
+}
+
+function mdBlock(md) {
+  const box = h("div", "md");
+  const inline = (s, parent) => {
+    const re = /\*\*([^*]+)\*\*|_([^_]+)_|\[([^\]]+)\]\((https?:[^)]+)\)/g; let i = 0, m;
+    while ((m = re.exec(s))) {
+      if (m.index > i) parent.append(document.createTextNode(s.slice(i, m.index)));
+      if (m[1]) parent.append(h("strong", null, m[1])); else if (m[2]) parent.append(h("em", null, m[2]));
+      else { const a = h("a", null, m[3]); a.href = encodeURI(m[4]); a.target = "_blank"; a.rel = "noopener"; parent.append(a); }
+      i = re.lastIndex;
+    }
+    if (i < s.length) parent.append(document.createTextNode(s.slice(i)));
+  };
+  let ul = null;
+  md.split("\n").forEach(line => {
+    if (/^\s*-\s+/.test(line)) { if (!ul) { ul = h("ul"); box.append(ul); } const li = h("li"); inline(line.replace(/^\s*-\s+/, ""), li); ul.append(li); return; }
+    ul = null; if (!line.trim()) return; const p = h("p"); inline(line, p); box.append(p);
+  });
+  return box;
+}
+function runDemo() {
+  if (busy()) return;
+  App.demo = true; showChat(true); noticeEl.hidden = true;
+  const box = $("#demoBrief"), ub = () => h("div", "ubub", DEMO.text);
+  box.replaceChildren(ub(), h("p", "demo-wait", "에이전트가 워크플로로 실시간 데이터를 모으고 있어요…"));
+  beginTurn(DEMO.text, true);
+  setTimeout(() => {
+    if (!App.turn || !App.turn.demo) return;
+    box.replaceChildren(ub(), mdBlock(extract(DEMO.md).text), h("p", "demo-tag", "SAMPLE · " + DEMO.at + " · 에이전트에 연결하지 않고 녹화 데이터로 재생했어요"));
+    box.scrollTop = 0; showResult(normalize(DEMO.data));
+  }, REDUCED ? 600 : 7600);
+}
+
+App.onStage = s => { Holo.setStage(s); const x = STAGE_HUD[s]; if (x && busy()) setHud(x[0], x[1] + (App.turn.demo ? " · 샘플" : "")); };
+App.onConnected = () => { if (App.connected) return; App.connected = true; setLink("on", "LINK · ONLINE"); Boot.ok(); if (!App.demo) noticeEl.hidden = true; refresh(); say("에이전트와 연결됐어요"); };
+App.onConnectError = e => { App.connected = false; const m = (e && e.message) || String(e || "unknown"); setLink("err", "LINK · OFFLINE"); Boot.fail(m.slice(0, 60)); showOffline(m); refresh(); };
+App.onBot = (a, r) => {
+  if (a.type === "typing") { if (App.turn && App.turn.paused && !App.turn.demo) resumeTurn(); return; }
+  renderSuggested(a.suggestedActions && a.suggestedActions.actions);
+  if (!App.turn || App.turn.demo) return;
+  if (r.data) { const d = normalize(r.data); if (d) { setTimeout(() => showResult(d), 0); return; } }
+  if (!String(r.text || "").trim() && !(a.attachments || []).length) return;
+  setTimeout(pauseTurn, 0);
+};
+// 에이전트 활동을 Web Chat에 그리기 전에 데이터 블록을 떼어 대시보드로 보냅니다.
+function makeStore() {
+  return window.WebChat.createStore({}, () => next => action => {
+    try {
+      if (action.type === "DIRECT_LINE/CONNECT_FULFILLED") App.onConnected();
+      else if (action.type === "DIRECT_LINE/INCOMING_ACTIVITY") {
+        const a = action.payload && action.payload.activity;
+        if (a && a.from && a.from.role !== "user" && (a.type === "message" || a.type === "typing")) {
+          const r = extract(a.text);
+          if (r.changed) action = Object.assign({}, action, { payload: Object.assign({}, action.payload, { activity: Object.assign({}, a, { text: r.text }) }) });
+          App.onBot(a, r);
+        }
+      }
+    } catch (e) { console.warn(e); }
+    return next(action);
+  });
+}
+const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "#dfe6ff", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "rgba(34,211,238,.12)", bubbleFromUserBorderColor: "rgba(34,211,238,.38)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 12, bubbleFromUserTextColor: "#ecfeff", subtle: "#8d96bd", accent: "#22d3ee", timestampColor: "#5d6594", paddingRegular: 10, paddingWide: 12 };
+
+Pipe.onStage(App.onStage);
+Holo.onPick(i => Rank.select(i, true));
+Rank.onPick(i => { Holo.select(i); Rank.select(i, false); });
+Rank.onHover(i => Holo.hover(i));
+q.addEventListener("input", () => { autosize(); refresh(); });
+q.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); submit(); } });
+sendBtn.addEventListener("click", () => submit());
+$("#demoBtn").addEventListener("click", runDemo);
+$("#newBtn").addEventListener("click", () => location.reload());
+document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); } });
+setInterval(() => { const d = new Date(); $("#clock").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) + (d.getTimezoneOffset() === -540 ? " KST" : ""); }, 1000);
+renderChips(); Rank.empty(); Ticker.idle(); setCoord(null); refresh();
+if (/[?&]demo/.test(location.search)) setTimeout(runDemo, 700);
+
+// ── agent-seal 연결 코드: BROKER_URL·SEALED 두 줄과 연결 흐름은 바꾸지 마세요 ──
+  const BROKER_URL = "https://dl-broker-juwon-4jt3z.azurewebsites.net/api/directlineToken";
+  const SEALED = "__SEALED__";
+
+  fetch(BROKER_URL, { method: "POST", body: JSON.stringify({ sealed: SEALED }) })
+    .then(r => r.json())
+    .then(({ token, error }) => {
+      if (!token) throw new Error(error);
+      const directLine = WebChat.createDirectLine({ token });
+      directLine.postActivity({ type: "event", name: "startConversation", from: { id: "user" } }).subscribe(); // 첫 인사말 요청
+      App.store = makeStore();
+      WebChat.renderWebChat({ directLine, store: App.store, styleOptions: STYLE, locale: "ko-KR" }, document.getElementById("webchat"));
+    })
+    .catch(e => App.onConnectError(e));
+</script>
+</body>
+</html>
