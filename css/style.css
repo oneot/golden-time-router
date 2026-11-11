@@ -1,10 +1,11 @@
-/* 골든타임 라우터 v2 · 먹색 바탕, 은색 점묘, 코랄 하나 */
+/* 골든타임 라우터 v2 · 먹색 바탕, 은색 점묘, 코랄 하나 (라이트 테마는 맨 아래) */
 :root {
   --bg: #07080b; --ink: #eef0f3; --ink-2: #c4c8cf; --muted: #8a8f99; --dim: #5d626c; --faint: #34373e;
   --line: rgba(255, 255, 255, .07); --line-2: rgba(255, 255, 255, .12); --line-3: rgba(255, 255, 255, .22);
   --coral: #ff7b6b; --coral-2: #ffa497; --coral-soft: rgba(255, 123, 107, .1); --silver: #d6dbe4; --amber: #e9b35f; --gray: #80858f; --mint: #7fd6b0;
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
   --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --wc-text: #dfe2e7; --wc-user-bg: rgba(255, 255, 255, .06); --wc-user-line: rgba(255, 255, 255, .12); --strong: #fff; --on-ink: #0a0b0e;
   --r: 20px; --gap: 16px; --ease: cubic-bezier(.22, .8, .2, 1);
 }
 * { box-sizing: border-box; }
@@ -52,6 +53,13 @@ body.is-error .status i { background: var(--coral); box-shadow: 0 0 0 3px rgba(2
 .btn { height: 32px; padding: 0 15px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .035); color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .3s var(--ease), border-color .3s var(--ease); }
 .btn:hover:not(:disabled) { background: rgba(255, 255, 255, .08); border-color: var(--line-3); }
 .btn:disabled { opacity: .4; cursor: default; }
+/* 테마 토글: 왼쪽 달(다크, 기본) · 오른쪽 해(라이트) */
+.tgl { position: relative; flex: none; display: inline-grid; grid-template-columns: 1fr 1fr; align-items: center; width: 60px; height: 32px; padding: 0 3px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .035); cursor: pointer; transition: background .3s var(--ease), border-color .3s var(--ease); }
+.tgl:hover { border-color: var(--line-3); }
+.tgl:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.tgl-k { position: absolute; top: 3px; left: 3px; width: 26px; height: 24px; border-radius: 999px; background: rgba(255, 255, 255, .1); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); transition: transform .45s var(--ease), background .3s var(--ease); }
+.tgl svg { position: relative; justify-self: center; width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; color: var(--dim); transition: color .3s var(--ease); }
+.tgl .i-moon { color: var(--ink); }
 
 /* 요청 */
 .m-title { margin: 14px 18px 0; font-size: 22px; font-weight: 500; line-height: 1.3; letter-spacing: -.03em; }
@@ -60,7 +68,7 @@ body.is-error .status i { background: var(--coral); box-shadow: 0 0 0 3px rgba(2
 .composer:focus-within { border-color: rgba(255, 255, 255, .26); background: rgba(255, 255, 255, .05); box-shadow: 0 0 0 4px rgba(255, 255, 255, .035); }
 .composer textarea { flex: 1; min-width: 0; min-height: 28px; max-height: 132px; padding: 7px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font-size: 15px; line-height: 1.55; letter-spacing: -.01em; }
 .composer textarea::placeholder { color: var(--dim); }
-.send { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--ink); color: #0a0b0e; cursor: pointer; transition: transform .35s var(--ease), background .35s var(--ease), color .35s var(--ease); }
+.send { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--ink); color: var(--on-ink); cursor: pointer; transition: transform .35s var(--ease), background .35s var(--ease), color .35s var(--ease); }
 .send svg { width: 16px; height: 16px; }
 .send:disabled { background: rgba(255, 255, 255, .07); color: var(--dim); cursor: default; }
 .send:not(:disabled):hover { transform: translateY(-1px); }
@@ -109,22 +117,22 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 #webchat:empty::before { content: "에이전트의 답과 근거가 여기에 나타나요."; display: block; padding: 8px 12px; font-size: 13px; color: var(--dim); }
 #webchat .webchat__typing-indicator { display: none !important; }
 #webchat .webchat__stacked-layout:not(.webchat__stacked-layout--from-user) .webchat__stacked-layout__status { display: none; }
-#webchat .webchat__render-markdown { font-size: 13.5px; line-height: 1.75; letter-spacing: -.005em; color: #dfe2e7; word-break: keep-all; overflow-wrap: anywhere; }
+#webchat .webchat__render-markdown { font-size: 13.5px; line-height: 1.75; letter-spacing: -.005em; color: var(--wc-text); word-break: keep-all; overflow-wrap: anywhere; }
 #webchat .webchat__render-markdown p { margin: 0 0 8px; }
 #webchat .webchat__render-markdown ul, #webchat .webchat__render-markdown ol { margin: 2px 0 10px; padding-left: 18px; }
 #webchat .webchat__render-markdown li { margin: 2px 0; }
-#webchat .webchat__render-markdown strong { color: #fff; font-weight: 600; }
+#webchat .webchat__render-markdown strong { color: var(--strong); font-weight: 600; }
 #webchat .webchat__render-markdown em { color: var(--muted); }
 #webchat .webchat__render-markdown a { color: var(--coral-2); text-underline-offset: 3px; }
 #webchat .webchat__render-markdown code { padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, .06); font: 12px var(--mono); }
 #webchat .webchat__render-markdown table { display: block; max-width: 100%; overflow-x: auto; margin: 10px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 #webchat .webchat__render-markdown th, #webchat .webchat__render-markdown td { padding: 7px 14px 7px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
-#webchat .webchat__scroll-to-end-button { background: var(--ink); color: #0a0b0e; border-radius: 999px; font-weight: 600; }
-.demo-brief { height: 100%; overflow: auto; padding: 8px 12px 12px; font-size: 13.5px; line-height: 1.75; color: #dfe2e7; }
-.demo-brief .ubub { width: fit-content; max-width: 85%; margin: 4px 0 14px auto; padding: 9px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .06); color: var(--ink); }
+#webchat .webchat__scroll-to-end-button { background: var(--ink); color: var(--on-ink); border-radius: 999px; font-weight: 600; }
+.demo-brief { height: 100%; overflow: auto; padding: 8px 12px 12px; font-size: 13.5px; line-height: 1.75; color: var(--wc-text); }
+.demo-brief .ubub { width: fit-content; max-width: 85%; margin: 4px 0 14px auto; padding: 9px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--wc-user-bg); color: var(--ink); }
 .demo-brief .md p { margin: 0 0 8px; }
 .demo-brief .md ul { margin: 2px 0 10px; padding-left: 18px; }
-.demo-brief .md strong { color: #fff; font-weight: 600; }
+.demo-brief .md strong { color: var(--strong); font-weight: 600; }
 .demo-brief .md em { color: var(--muted); }
 .demo-brief .md a { color: var(--coral-2); text-underline-offset: 3px; }
 .demo-tag { margin: 12px 0 0; font: 500 10.5px/1.6 var(--mono); color: var(--dim); }
@@ -259,3 +267,59 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 @media (min-width: 1181px) and (max-height: 1000px) { .m-sub, .hint, .stages span { display: none; } .m-title { margin-top: 10px; font-size: 20px; } .stages li { padding-bottom: 9px; } .composer { margin-top: 12px; } .pipe-note { margin-bottom: 12px; } }
 @media (min-width: 1181px) and (max-height: 760px) { .brief { flex-basis: 200px; } .hud-state { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
+
+/* ── 라이트 테마: 종이 바탕, 먹 점묘, 코랄 하나 ── 오른쪽 위 토글 또는 주소 ?theme=light. 색만 바꾸고 배치는 다크와 같습니다. */
+:root[data-theme="light"] {
+  --bg: #f4f3f0; --ink: #121317; --ink-2: #34373e; --muted: #5b5e66; --dim: #7a7d85; --faint: #cfd0d3;
+  --line: rgba(18, 19, 23, .08); --line-2: rgba(18, 19, 23, .13); --line-3: rgba(18, 19, 23, .24);
+  --coral: #e5533e; --coral-2: #c0392b; --coral-soft: rgba(229, 83, 62, .1); --silver: #5a606c; --amber: #bf7a14; --gray: #9a9ea6; --mint: #23996b;
+  --wc-text: #2b2e34; --wc-user-bg: #fff; --wc-user-line: rgba(18, 19, 23, .12); --strong: #121317; --on-ink: #fff;
+  color-scheme: light; scrollbar-color: rgba(18, 19, 23, .18) transparent;
+}
+[data-theme="light"] body { background: radial-gradient(1200px 720px at 50% -14%, rgba(255, 255, 255, .95), transparent 62%), radial-gradient(900px 600px at 50% 62%, rgba(226, 214, 196, .16), transparent 70%), var(--bg); }
+[data-theme="light"] .grain { opacity: .05; mix-blend-mode: multiply; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(18, 19, 23, .15); }
+[data-theme="light"] ::selection { background: rgba(229, 83, 62, .2); }
+[data-theme="light"] .mark .mk-l { stroke: var(--ink); }
+[data-theme="light"] .mark .mk-c { stroke: var(--coral); }
+[data-theme="light"] .mark .mk-o { fill: var(--ink); }
+[data-theme="light"] .panel { background: linear-gradient(180deg, rgba(255, 255, 255, .88), rgba(255, 255, 255, .7)); box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(18, 19, 23, .04), 0 28px 56px -40px rgba(48, 36, 20, .3); }
+[data-theme="light"] .status, [data-theme="light"] .btn, [data-theme="light"] .tgl { background: rgba(255, 255, 255, .75); }
+[data-theme="light"] .btn:hover:not(:disabled) { background: #fff; }
+[data-theme="light"] .tgl-k { transform: translateX(26px); background: #fff; box-shadow: 0 1px 3px rgba(18, 19, 23, .14), inset 0 0 0 1px rgba(18, 19, 23, .07); }
+[data-theme="light"] .tgl .i-moon { color: var(--dim); }
+[data-theme="light"] .tgl .i-sun { color: var(--ink); }
+[data-theme="light"] body.is-connected .status i { box-shadow: 0 0 0 3px rgba(35, 153, 107, .16); }
+[data-theme="light"] .composer { background: rgba(255, 255, 255, .85); }
+[data-theme="light"] .composer:focus-within { border-color: rgba(18, 19, 23, .3); background: #fff; box-shadow: 0 0 0 4px rgba(18, 19, 23, .05); }
+[data-theme="light"] .send:disabled { background: rgba(18, 19, 23, .06); }
+[data-theme="light"] .chip, [data-theme="light"] .notice, [data-theme="light"] .need, [data-theme="light"] .abtn { background: rgba(255, 255, 255, .8); }
+[data-theme="light"] .chip:hover:not(:disabled), [data-theme="light"] .abtn:hover { background: #fff; }
+[data-theme="light"] .chip.sa { border-color: rgba(229, 83, 62, .35); }
+[data-theme="light"] .stages li.done i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5 9.5 17 19 7.5'/%3E%3C/svg%3E"); }
+[data-theme="light"] #webchat .webchat__render-markdown code { background: rgba(18, 19, 23, .05); }
+[data-theme="light"] .stage::before { background: radial-gradient(56% 50% at 50% 54%, rgba(255, 255, 255, .7), transparent 72%); }
+[data-theme="light"] .hud { text-shadow: 0 0 16px rgba(244, 243, 240, .95), 0 0 4px rgba(244, 243, 240, .9); }
+[data-theme="light"] .lg .e { background: var(--ink); box-shadow: 0 0 5px rgba(18, 19, 23, .25); }
+[data-theme="light"] .lg .o { background: var(--ink); box-shadow: 0 0 0 2px rgba(18, 19, 23, .14); }
+[data-theme="light"] .tip { background: rgba(255, 255, 255, .95); box-shadow: 0 20px 50px -20px rgba(48, 36, 20, .3); }
+[data-theme="light"] .empty, [data-theme="light"] .card { background: rgba(255, 255, 255, .78); }
+[data-theme="light"] .card:hover, [data-theme="light"] .card.is-sel { background: #fff; }
+[data-theme="light"] .card.r1 { border-color: rgba(229, 83, 62, .35); background: radial-gradient(120% 90% at 0% 0%, rgba(229, 83, 62, .09), transparent 60%), rgba(255, 255, 255, .86); }
+[data-theme="light"] .card.r1:hover, [data-theme="light"] .card.r1.is-sel { border-color: rgba(229, 83, 62, .6); }
+[data-theme="light"] .m.warn b, [data-theme="light"] .chkp b, [data-theme="light"] .insight b, [data-theme="light"] .bar .nm small { color: #8f5a0b; }
+[data-theme="light"] .chkp { background: rgba(191, 122, 20, .07); border-color: rgba(191, 122, 20, .22); }
+[data-theme="light"] .insight { background: rgba(191, 122, 20, .06); border-color: rgba(191, 122, 20, .2); }
+[data-theme="light"] .bar:hover, [data-theme="light"] .bar.is-sel { background: rgba(18, 19, 23, .04); }
+[data-theme="light"] .bar .nm small { background: rgba(191, 122, 20, .12); }
+[data-theme="light"] .bar .track { background: rgba(18, 19, 23, .07); }
+[data-theme="light"] .st-alt .track i { background: rgba(90, 96, 108, .5); }
+[data-theme="light"] .st-hold .track i { background: repeating-linear-gradient(90deg, var(--amber) 0 4px, rgba(191, 122, 20, .3) 4px 7px); }
+[data-theme="light"] .st-out .track i { background: rgba(154, 158, 166, .55); }
+[data-theme="light"] .st-out .nm, [data-theme="light"] .st-out .v { text-decoration-color: rgba(154, 158, 166, .85); }
+[data-theme="light"] .skel { background: rgba(255, 255, 255, .6); }
+[data-theme="light"] .skel-l { background: rgba(18, 19, 23, .06); }
+[data-theme="light"] .skel-bar { background: rgba(18, 19, 23, .035); }
+[data-theme="light"] .skel::after, [data-theme="light"] .skel-bar::after { background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .75) 50%, transparent 70%); }
+/* 테마를 바꿀 때 화면 전체를 부드럽게 겹쳐 바꿉니다(지원하는 브라우저만, 동작 줄이기에서는 바로 바뀜). */
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .5s; animation-timing-function: cubic-bezier(.22, .8, .2, 1); }

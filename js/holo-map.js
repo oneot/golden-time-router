@@ -8,7 +8,17 @@
 const Holo = (() => {
   const stage = $("#holoPanel"), glc = $("#holoGL"), cv = $("#holo"), ctx = cv.getContext("2d"), tipEl = $("#tip");
   const D0 = 4, KOREA = [36.3, 127.8], KBOX = [33.05, 38.7, 124.55, 131.95], KC = [(KBOX[0] + KBOX[1]) / 2, (KBOX[2] + KBOX[3]) / 2];
-  const CORAL = COL.rec, AMBER = COL.hold, SILVER = COL.alt, GRAY = COL.out, WARM = [246, 241, 233], WHITE = [255, 255, 255], SAND = [240, 201, 138];
+  // 테마별 색. 다크는 먹색 바탕에 흰색·은색, 라이트는 종이 바탕에 먹색입니다. 코랄(추천)·호박(확인 필요)·회색(제외)은 두 테마에서 뜻이 같습니다.
+  // gl*: 셰이더 점 색(0~1), t*: 병원 주변 점 구름(기본 · 제외 · 확인 필요 · 추천)
+  const PALS = {
+    dark: { ink: [255, 255, 255], silver: COL.alt, warm: [246, 241, 233], coral: COL.rec, amber: COL.hold, gray: COL.out, sand: [240, 201, 138], halo: [7, 8, 11], chip: [9, 10, 14], chipA: .86, pulse: [255, 226, 220], dots: [214, 221, 235], hot: [255, 153, 133],
+      glInk: [.84, .87, .93], glHot: [1, .6, .52], tb: [.84, .87, .93], tg: [.5, .52, .56], ta: [.91, .7, .37], tc: [1, .48, .42],
+      nm: [214, 219, 228, .85], nmTop: [255, 255, 255, .97], nmOut: [140, 145, 155, .75], nmChk: [233, 179, 95, .95], rankNo: [255, 164, 151], amberT: COL.hold, grayT: COL.out, erGlow: .55, erR: 1.25, erA: 1 },
+    light: { ink: [17, 18, 22], silver: [86, 92, 104], warm: [26, 27, 33], coral: [226, 82, 62], amber: [188, 120, 18], gray: [152, 156, 164], sand: [146, 92, 14], halo: [244, 243, 240], chip: [255, 255, 255], chipA: .94, pulse: [150, 26, 14], dots: [40, 44, 52], hot: [224, 80, 60],
+      glInk: [.07, .075, .09], glHot: [.89, .32, .24], tb: [.07, .075, .09], tg: [.6, .61, .64], ta: [.74, .47, .07], tc: [.89, .32, .24],
+      nm: [44, 47, 54, .86], nmTop: [17, 18, 22, .97], nmOut: [128, 132, 140, .85], nmChk: [146, 92, 14, .95], rankNo: [192, 57, 43], amberT: [146, 92, 14], grayT: [128, 132, 140], erGlow: 0, erR: .95, erA: .9 }
+  };
+  let THEME = "dark", PAL = PALS.dark, INK, SILVER, WARM, CORAL, AMBER, GRAY, SAND;
   const LIGHT = (() => { const l = [-.42, .55, .72], n = Math.hypot(...l); return l.map(x => x / n); })();
   const ER_R = [2.4, 1.8, 1.35, 1.05], ER_A = [1, .86, .68, .48];
   const B1 = 350, B2 = 950, B3 = 1550;
@@ -22,11 +32,25 @@ const Holo = (() => {
   const F = { alpha: 0, bloom: 0 };
   const S = { phase: "globe", ep: 0, dive: null, fly: null, origin: null, oname: "", meta: null, nodes: [], gone: [], nodeEr: new Set(), data: null, res: null, qo: null, ring: null, ringLabs: [], chip: null, nearest: null, approx: false, na: 0, lz: 0, o2: [0, 0], stage: 0, sel: null, hov: null, pick: null, onBeat: null, tracers: [], nextTracer: 0, pinAt: 0, lt0: 0, arrived: 0, rt0: 0, fsig: "", tint: new Float32Array(64) };
   const M = new Float32Array(9), MG = new Float32Array(9), BA = new Float32Array(9), BB = new Float32Array(9), tmp = [0, 0, 0, 0];
-  const SPR = (() => {
+  // 불빛(glow)과 응급실 점(dot) 그림. 라이트에서는 불빛 대신 옅은 먹 번짐입니다.
+  const SPRS = (() => {
     const mk = (n, f) => { const c = document.createElement("canvas"); c.width = c.height = n; f(c.getContext("2d"), n); return c; };
     const rad = (stops) => (g, n) => { const r = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2); stops.forEach(([o, c]) => r.addColorStop(o, c)); g.fillStyle = r; g.fillRect(0, 0, n, n); };
-    return { glow: mk(64, rad([[0, "rgba(255,232,218,.6)"], [.3, "rgba(255,222,206,.18)"], [1, "rgba(255,222,206,0)"]])), dot: mk(32, rad([[0, "rgba(250,246,240,1)"], [.55, "rgba(250,246,240,.96)"], [1, "rgba(250,246,240,0)"]])) };
+    const set = (glow, dot) => ({ glow: mk(64, rad(glow)), dot: mk(32, rad(dot)) });
+    return {
+      dark: set([[0, "rgba(255,232,218,.6)"], [.3, "rgba(255,222,206,.18)"], [1, "rgba(255,222,206,0)"]], [[0, "rgba(250,246,240,1)"], [.55, "rgba(250,246,240,.96)"], [1, "rgba(250,246,240,0)"]]),
+      light: set([[0, "rgba(36,28,24,.2)"], [.3, "rgba(36,28,24,.06)"], [1, "rgba(36,28,24,0)"]], [[0, "rgba(22,23,28,1)"], [.55, "rgba(22,23,28,.96)"], [1, "rgba(22,23,28,0)"]])
+    };
   })();
+  let SPR = SPRS.dark;
+  // 테마 바꾸기: 색·그림만 바꾸고 장면(단계·카메라·예약)은 그대로 이어 갑니다.
+  function setTheme(t) {
+    THEME = t === "light" ? "light" : "dark"; PAL = PALS[THEME]; SPR = SPRS[THEME];
+    INK = PAL.ink; SILVER = PAL.silver; WARM = PAL.warm; CORAL = PAL.coral; AMBER = PAL.amber; GRAY = PAL.gray; SAND = PAL.sand;
+    if (!G2 && KOFF) buildKoff();
+    if (REDUCED && W > 1) frame(now());
+  }
+  setTheme(document.documentElement.dataset.theme);
 
   // ── 시간 변화 ──
   const tweens = [];
@@ -101,7 +125,7 @@ const Holo = (() => {
   function ring(x, y, r, col, a, lw) { if (a <= .003 || r <= 0) return; ctx.strokeStyle = rgba(col, a); ctx.lineWidth = lw * DPR; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke(); }
   function dot(x, y, r, col, a) { if (a <= .003 || r <= 0) return; ctx.fillStyle = rgba(col, a); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
   function xmark(x, y, s, col, a) { if (a <= .003) return; ctx.strokeStyle = rgba(col, a); ctx.lineWidth = 1.25 * DPR; ctx.beginPath(); ctx.moveTo(x - s, y - s); ctx.lineTo(x + s, y + s); ctx.moveTo(x + s, y - s); ctx.lineTo(x - s, y + s); ctx.stroke(); }
-  function text(s, x, y, font, col, a, align = "left") { if (a <= .003) return; ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.globalAlpha = 1; ctx.lineWidth = 4 * DPR; ctx.strokeStyle = "rgba(7,8,11," + (.9 * Math.min(1, a * 1.4)) + ")"; ctx.strokeText(s, x, y); ctx.fillStyle = rgba(col, a); ctx.fillText(s, x, y); }
+  function text(s, x, y, font, col, a, align = "left") { if (a <= .003) return; ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle"; ctx.lineJoin = "round"; ctx.globalAlpha = 1; ctx.lineWidth = 4 * DPR; ctx.strokeStyle = rgba(PAL.halo, .9 * Math.min(1, a * 1.4)); ctx.strokeText(s, x, y); ctx.fillStyle = rgba(col, a); ctx.fillText(s, x, y); }
   // ── 지구본: 흩날리는 은색 선(분위기 연출)과 한국 표시 ──
   function arcPoints(a, b, lift) {
     const A = vec(a[0], a[1]), B = vec(b[0], b[1]), w = Math.acos(clamp(A[0] * B[0] + A[1] * B[1] + A[2] * B[2], -1, 1)), sw = Math.sin(w) || 1, n = 40, P = new Float32Array((n + 1) * 3);
@@ -133,10 +157,10 @@ const Holo = (() => {
     ctx.lineCap = "round"; ctx.lineWidth = 1.1 * DPR;
     for (let i = 1; i <= head; i++) {
       if (!pts[i * 3 + 2] || !pts[i * 3 - 1]) continue;
-      const u = i / head; ctx.strokeStyle = rgba(WHITE, (.04 + .8 * u * u) * fa);
+      const u = i / head; ctx.strokeStyle = rgba(INK, (.04 + .8 * u * u) * fa);
       ctx.beginPath(); ctx.moveTo(pts[i * 3 - 3], pts[i * 3 - 2]); ctx.lineTo(pts[i * 3], pts[i * 3 + 1]); ctx.stroke();
     }
-    if (p < 1 && pts[head * 3 + 2]) { const hx = pts[head * 3], hy = pts[head * 3 + 1], r = 7 * DPR; ctx.globalAlpha = .5 * fa; ctx.drawImage(SPR.glow, hx - r, hy - r, r * 2, r * 2); ctx.globalAlpha = 1; dot(hx, hy, 1.4 * DPR, WHITE, fa); }
+    if (p < 1 && pts[head * 3 + 2]) { const hx = pts[head * 3], hy = pts[head * 3 + 1], r = 7 * DPR; ctx.globalAlpha = .5 * fa; ctx.drawImage(SPR.glow, hx - r, hy - r, r * 2, r * 2); ctx.globalAlpha = 1; dot(hx, hy, 1.4 * DPR, INK, fa); }
   }
   function drawKoreaLabel() {
     const v = vec(KOREA[0], KOREA[1]); gproj(v[0], v[1], v[2], tmp);
@@ -145,8 +169,8 @@ const Holo = (() => {
     ctx.font = f1; const tw = ctx.measureText(t1).width;
     // 글자는 늘 한국 오른쪽 위에 적되, 화면 밖으로 나가면 안쪽으로 당깁니다(좁은 화면에서 지구본 대륙 위를 덮지 않게).
     const x = tmp[0] + 8 * DPR, y = tmp[1] - 6 * DPR, ly = y - 26 * DPR, tx = Math.min(x + 50 * DPR, W - 10 * DPR - tw), ex = Math.min(x + 30 * DPR, tx - 20 * DPR);
-    ctx.strokeStyle = rgba(WHITE, .32 * a); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ly); ctx.lineTo(tx - 6 * DPR, ly); ctx.stroke();
-    text(t1, tx, ly, f1, WHITE, .92 * a);
+    ctx.strokeStyle = rgba(INK, .32 * a); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ly); ctx.lineTo(tx - 6 * DPR, ly); ctx.stroke();
+    text(t1, tx, ly, f1, INK, .92 * a);
   }
 
   // ── 한반도 지도: 전국 응급실과 출발지 핀 ──
@@ -158,9 +182,9 @@ const Holo = (() => {
       p[0] = cx + (e.lng - C.lng) * cos0; p[1] = cy - (e.lat - C.lat) * 110.574 * k;
       if (p[0] < -pad || p[1] < -pad || p[0] > W + pad || p[1] > H + pad) continue;
       const a = A * ER_A[e.cls] * dim * (.86 + .14 * Math.sin(t * .0017 + i * 1.7));
-      if (pass === 0) { const r = (6 + 3 * sc) * DPR * (e.cls ? 1 : 1.35); ctx.globalAlpha = .55 * a; ctx.drawImage(SPR.glow, p[0] - r, p[1] - r, r * 2, r * 2); }
+      if (pass === 0) { if (PAL.erGlow) { const r = (6 + 3 * sc) * DPR * (e.cls ? 1 : 1.35); ctx.globalAlpha = PAL.erGlow * a; ctx.drawImage(SPR.glow, p[0] - r, p[1] - r, r * 2, r * 2); } }
       else {
-        const r = ER_R[e.cls] * sc * DPR * 1.25; ctx.globalAlpha = a; ctx.drawImage(SPR.dot, p[0] - r, p[1] - r, r * 2, r * 2);
+        const r = ER_R[e.cls] * sc * DPR * PAL.erR; ctx.globalAlpha = a * PAL.erA; ctx.drawImage(SPR.dot, p[0] - r, p[1] - r, r * 2, r * 2);
         if (!e.cls) { ctx.globalAlpha = 1; ring(p[0], p[1], r + 3 * DPR, WARM, .3 * a, .8); if (S.phase === "korea" && !REDUCED) { const u = ((t / 4200) + i * .37) % 1; ring(p[0], p[1], r + (4 + 16 * u) * DPR, WARM, .16 * a * (1 - u), .8); } }
       }
     }
@@ -181,9 +205,9 @@ const Holo = (() => {
     const off = 60 * DPR, room = sd => sd < 0 ? x - off - tw - 8 * DPR : W - 8 * DPR - (x + off + tw);
     let side = x < cx ? -1 : 1; if (room(side) < 0 && room(-side) > room(side)) side = -side;
     const vdir = y < cy + 40 * DPR ? 1 : -1, ex = x + side * 42 * DPR, ey = y + vdir * 58 * DPR, tx = ex + side * 12 * DPR, al = side < 0 ? "right" : "left";
-    ctx.strokeStyle = rgba(WHITE, .35 * la); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(x + side * 7 * DPR, y + vdir * 7 * DPR); ctx.lineTo(ex, ey); ctx.lineTo(tx, ey); ctx.stroke();
+    ctx.strokeStyle = rgba(INK, .35 * la); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(x + side * 7 * DPR, y + vdir * 7 * DPR); ctx.lineTo(ex, ey); ctx.lineTo(tx, ey); ctx.stroke();
     const X = tx + side * 6 * DPR;
-    L.forEach((l, i) => text(l[0], X, ey + [-8, 9, 25][i] * DPR, l[1], WHITE, l[2] * la, al));
+    L.forEach((l, i) => text(l[0], X, ey + [-8, 9, 25][i] * DPR, l[1], INK, l[2] * la, al));
   }
   // ── 출발지 주변: 병원 점, 주변 점 구름, 라벨 배치 ──
   function waitNode(c) { return { key: "e" + c.i, er: c.i, lat: c.lat, lng: c.lng, name: c.name, short: c.short, kind: c.kind, km: c.km, h: null, born: now(), ph: Math.random() }; }
@@ -249,17 +273,17 @@ const Holo = (() => {
   }
   function layoutWait() {
     const pos = targetPos(C.lat, C.lng, kd());
-    placeLabels(pos, S.nodes.slice().sort((a, b) => a.km - b.km).map(n => ({ n, slot: "labW", segs: [{ t: n.short, f: "500 " + 11.5 * DPR + "px " + FONT, role: "name" }, { t: "  " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + MONO, c: WHITE, a: .45 }] })));
+    placeLabels(pos, S.nodes.slice().sort((a, b) => a.km - b.km).map(n => ({ n, slot: "labW", segs: [{ t: n.short, f: "500 " + 11.5 * DPR + "px " + FONT, role: "name" }, { t: "  " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + MONO, c: "ink", a: .45 }] })));
   }
   // 결과 라벨 조각마다 나타나는 시각이 다릅니다: 이름(처음) · 제외/확인 필요(①②) · 도착 시간(도착 순간) · 순위 번호(④) · 직선 최단(마지막)
   function resultSegs(n) {
     const x = n.h, R = S.res, segs = [];
-    if (x.rank) segs.push({ t: x.rank + "  ", f: "600 " + 11 * DPR + "px " + MONO, c: [255, 164, 151], a: 1, show: R.B4 + (x.rank - 1) * 150 });
+    if (x.rank) segs.push({ t: x.rank + "  ", f: "600 " + 11 * DPR + "px " + MONO, c: "rankNo", a: 1, show: R.B4 + (x.rank - 1) * 150 });
     segs.push({ t: x.short, f: "500 " + 12 * DPR + "px " + FONT, role: "name", show: 0 });
-    if (x.st !== "out" && x.min != null) segs.push({ t: "  " + x.min + "분", f: "500 " + 11.5 * DPR + "px " + FONT, c: WHITE, a: .6, show: n.arr != null ? n.arr : R.B4 });
+    if (x.st !== "out" && x.min != null) segs.push({ t: "  " + x.min + "분", f: "500 " + 11.5 * DPR + "px " + FONT, c: "ink", a: .6, show: n.arr != null ? n.arr : R.B4 });
     const tag = x.st === "out" ? "제외" : x.chk ? x.why : "";
-    if (tag) segs.push({ t: "  " + tag, f: "500 " + 10.5 * DPR + "px " + FONT, c: x.st === "out" ? GRAY : AMBER, a: .95, show: x.st === "out" ? B1 : B2 });
-    if (S.nearest === n && x.rank !== 1) segs.push({ t: "  직선 최단 " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + FONT, c: SAND, a: .95, show: R.B4 + 500 });
+    if (tag) segs.push({ t: "  " + tag, f: "500 " + 10.5 * DPR + "px " + FONT, c: x.st === "out" ? "grayT" : "amberT", a: .95, show: x.st === "out" ? B1 : B2 });
+    if (S.nearest === n && x.rank !== 1) segs.push({ t: "  직선 최단 " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + FONT, c: "sand", a: .95, show: R.B4 + 500 });
     return segs;
   }
   function layoutResult(lat0, lng0, k) {
@@ -273,28 +297,28 @@ const Holo = (() => {
   function drawLab(n, lab, base, tt, nameCol) {
     if (!lab || base <= .01) return;
     const y = n.sy + lab.oy + lab.h / 2;
-    if (lab.lead) { ctx.strokeStyle = n.h && n.h.rank && S.res && tt >= S.res.B4 ? rgba(CORAL, .5 * base) : rgba(WHITE, .24 * base); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(n.sx + lab.lead[0], n.sy + lab.lead[1]); ctx.lineTo(n.sx + lab.lead[2], n.sy + lab.lead[3]); ctx.stroke(); }
+    if (lab.lead) { ctx.strokeStyle = n.h && n.h.rank && S.res && tt >= S.res.B4 ? rgba(CORAL, .5 * base) : rgba(INK, .24 * base); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(n.sx + lab.lead[0], n.sy + lab.lead[1]); ctx.lineTo(n.sx + lab.lead[2], n.sy + lab.lead[3]); ctx.stroke(); }
     let x = n.sx + lab.ox;
     for (const s of lab.segs) {
       ctx.font = s.f; const w = ctx.measureText(s.t).width, p = s.show == null ? 1 : clamp((tt - s.show) / 350, 0, 1);
-      if (p > 0) text(s.t, x, y, s.f, s.role === "name" ? nameCol : s.c, (s.role === "name" ? nameCol[3] : s.a) * p * base);
+      if (p > 0) text(s.t, x, y, s.f, s.role === "name" ? nameCol : typeof s.c === "string" ? PAL[s.c] : s.c, (s.role === "name" ? nameCol[3] : s.a) * p * base);
       x += w;
     }
   }
-  function drawRings(o, a) { if (!S.ring || S.approx || a <= .01) return; const k = kd(); for (let j = 1; j <= S.ring.rings; j++) ring(o[0], o[1], S.ring.step * j * k, WHITE, .045 * a, 1); }
-  function drawRingLabs(o, a) { if (a > .01) for (const L of S.ringLabs) text(L.txt, o[0] + L.ox, o[1] + L.oy + 6 * DPR, "500 " + 10 * DPR + "px " + MONO, WHITE, .4 * a); }
+  function drawRings(o, a) { if (!S.ring || S.approx || a <= .01) return; const k = kd(); for (let j = 1; j <= S.ring.rings; j++) ring(o[0], o[1], S.ring.step * j * k, INK, .045 * a, 1); }
+  function drawRingLabs(o, a) { if (a > .01) for (const L of S.ringLabs) text(L.txt, o[0] + L.ox, o[1] + L.oy + 6 * DPR, "500 " + 10 * DPR + "px " + MONO, INK, .4 * a); }
   function drawOrigin(t, o, a) {
     if (a <= .01 || S.approx) return;
-    if (!REDUCED) for (let k = 0; k < 2; k++) { const u = (t / 3400 + k / 2) % 1; ring(o[0], o[1], (6 + 44 * E.out(u)) * DPR, WHITE, .32 * (1 - u) * a, 1); }
-    ring(o[0], o[1], 9 * DPR, WHITE, .55 * a, 1.1); dot(o[0], o[1], 3.4 * DPR, WHITE, a);
+    if (!REDUCED) for (let k = 0; k < 2; k++) { const u = (t / 3400 + k / 2) % 1; ring(o[0], o[1], (6 + 44 * E.out(u)) * DPR, INK, .32 * (1 - u) * a, 1); }
+    ring(o[0], o[1], 9 * DPR, INK, .55 * a, 1.1); dot(o[0], o[1], 3.4 * DPR, INK, a);
   }
   function drawChip(o, a) {
     const L = S.chip; if (!L || a <= .01) return;
     const x = o[0] + L.ox, y = o[1] + L.oy, r = L.h / 2;
-    ctx.fillStyle = "rgba(9,10,14," + .86 * a + ")"; ctx.strokeStyle = rgba(WHITE, .16 * a); ctx.lineWidth = DPR;
+    ctx.fillStyle = rgba(PAL.chip, PAL.chipA * a); ctx.strokeStyle = rgba(INK, .16 * a); ctx.lineWidth = DPR;
     ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + L.w, y, x + L.w, y + L.h, r); ctx.arcTo(x + L.w, y + L.h, x, y + L.h, r); ctx.arcTo(x, y + L.h, x, y, r); ctx.arcTo(x, y, x + L.w, y, r); ctx.closePath(); ctx.fill(); ctx.stroke();
-    text("출발", x + 12 * DPR, y + r + .5 * DPR, "500 " + 10 * DPR + "px " + FONT, WHITE, .5 * a);
-    text(L.name, x + 20 * DPR + L.tw0, y + r + .5 * DPR, "600 " + 12 * DPR + "px " + FONT, WHITE, a);
+    text("출발", x + 12 * DPR, y + r + .5 * DPR, "500 " + 10 * DPR + "px " + FONT, INK, .5 * a);
+    text(L.name, x + 20 * DPR + L.tw0, y + r + .5 * DPR, "600 " + 12 * DPR + "px " + FONT, INK, a);
   }
   // 기다리는 동안: 후보 10곳으로 점선 조회선과 오가는 요청 점. 'AI 판단' 단계부터는 요청 점을 멈추고 후보가 숨 쉬듯 깜빡입니다.
   function drawWait(t, o) {
@@ -306,7 +330,7 @@ const Holo = (() => {
         ctx.setLineDash([2 * DPR, 5 * DPR]); ctx.strokeStyle = rgba(SILVER, .22 * qa * a * (s5 ? .6 : 1)); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(n.sx, n.sy); ctx.stroke(); ctx.setLineDash([]);
         if (!s5 && !REDUCED) for (let k = 0; k < 2; k++) {
           const u = ((tl / 1700) + n.ph + k / 2) % 1, x = o[0] + (n.sx - o[0]) * u, y = o[1] + (n.sy - o[1]) * u, b = Math.sin(Math.PI * u) * qa * a, r = 6 * DPR;
-          ctx.globalAlpha = .45 * b; ctx.drawImage(SPR.glow, x - r, y - r, r * 2, r * 2); ctx.globalAlpha = 1; dot(x, y, 1.3 * DPR, WHITE, .95 * b);
+          ctx.globalAlpha = .45 * b; ctx.drawImage(SPR.glow, x - r, y - r, r * 2, r * 2); ctx.globalAlpha = 1; dot(x, y, 1.3 * DPR, INK, .95 * b);
         }
       }
       dot(n.sx, n.sy, 2.7 * DPR, mix3(WARM, SILVER, lz), .95 * a);
@@ -316,16 +340,16 @@ const Holo = (() => {
         ring(n.sx, n.sy, 13 * DPR, SILVER, .14 * q, 1);
         if (s5 && inLocal && !REDUCED) { const u = ((t / 2200) + n.ph) % 1; ring(n.sx, n.sy, (8 + 12 * u) * DPR, SILVER, .3 * (1 - u) * q, 1); }
       }
-      if (n === S.hov || n === S.sel) ring(n.sx, n.sy, 11 * DPR, WHITE, .85 * a, 1.1);
+      if (n === S.hov || n === S.sel) ring(n.sx, n.sy, 11 * DPR, INK, .85 * a, 1.1);
     }
-    if (la > 0) for (const n of S.nodes) drawLab(n, n.labW, la * C.alpha * S.na, 1e9, [214, 219, 228, .85]);
+    if (la > 0) for (const n of S.nodes) drawLab(n, n.labW, la * C.alpha * S.na, 1e9, PAL.nm);
   }
   function nameColor(n, tt) {
     const x = n.h, R = S.res;
-    if (x.rank && tt >= R.B4 + (x.rank - 1) * 150) return [255, 255, 255, .97];
-    if (x.st === "out" && tt >= B1) return [140, 145, 155, .75];
-    if (x.chk && tt >= B2) return [233, 179, 95, .95];
-    return [214, 219, 228, .85];
+    if (x.rank && tt >= R.B4 + (x.rank - 1) * 150) return PAL.nmTop;
+    if (x.st === "out" && tt >= B1) return PAL.nmOut;
+    if (x.chk && tt >= B2) return PAL.nmChk;
+    return PAL.nm;
   }
   function drawResNode(n, t, tt) {
     const x = n.h, R = S.res, A = C.alpha * nodeIn(n, t); if (!x || A <= .01) return;
@@ -336,15 +360,15 @@ const Holo = (() => {
       xmark(X, Y, 3.2 * DPR * p, GRAY, .8 * A * p);
     } else {
       const rk = x.rank, rp = rk ? E.out(clamp((tt - R.B4 - (rk - 1) * 150) / 450, 0, 1)) : 0, cp = x.chk ? E.out(clamp((tt - B2) / 450, 0, 1)) : 0, arr = n.arr != null ? tt - n.arr : -1;
-      if (rp < 1) dot(X, Y, (arr >= 0 ? 3 : 2.7) * DPR, arr >= 0 ? (x.chk ? AMBER : WHITE) : SILVER, (arr >= 0 ? 1 : .9) * A * (1 - rp));
+      if (rp < 1) dot(X, Y, (arr >= 0 ? 3 : 2.7) * DPR, arr >= 0 ? (x.chk ? AMBER : INK) : SILVER, (arr >= 0 ? 1 : .9) * A * (1 - rp));
       if (rp > 0) {
         const r = (rk === 1 ? 4.6 : 3.8) * DPR * rp; dot(X, Y, r, CORAL, A * rp); ring(X, Y, r + (rk === 1 ? 7 : 5.5) * DPR, CORAL, (rk === 1 ? .9 : .5) * A * rp, 1.2);
         if (rk === 1 && rp >= 1 && !REDUCED) { const u = (t % 2600) / 2600; ring(X, Y, r + (7 + 22 * E.out(u)) * DPR, CORAL, .45 * (1 - u) * A, 1); }
       }
       if (cp > 0) { ring(X, Y, (rk ? 13.5 : 6.5) * DPR, AMBER, .9 * A * cp, 1.3); if (cp < 1) ring(X, Y, (6 + 20 * cp) * DPR, AMBER, .6 * (1 - cp) * A, 1); }
-      if (arr >= 0 && arr < 600) { const u = arr / 600; ring(X, Y, (5 + 18 * E.out(u)) * DPR, x.chk ? AMBER : WHITE, .7 * (1 - u) * A, 1.1); }
+      if (arr >= 0 && arr < 600) { const u = arr / 600; ring(X, Y, (5 + 18 * E.out(u)) * DPR, x.chk ? AMBER : INK, .7 * (1 - u) * A, 1.1); }
     }
-    if (n === S.hov || n === S.sel) ring(X, Y, (x.rank ? 19 : 11) * DPR, WHITE, .85 * A, 1.1);
+    if (n === S.hov || n === S.sel) ring(X, Y, (x.rank ? 19 : 11) * DPR, INK, .85 * A, 1.1);
   }
   // 결과: ① 제외 ② 확인 필요 ③ 남은 곳으로 동시에 출발해 실제 소요 시간(초)에 비례해 도착 ④ 1~3순위 경로
   function drawResult(t, o) {
@@ -355,7 +379,7 @@ const Holo = (() => {
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     for (const n of R.racers) {
       if (tt < B3 - 300) break;
-      const P = curve(o[0], o[1], n.sx, n.sy, n.bend), cnt = P.length / 2 - 1, x = n.h, col = x.chk ? AMBER : WHITE;
+      const P = curve(o[0], o[1], n.sx, n.sy, n.bend), cnt = P.length / 2 - 1, x = n.h, col = x.chk ? AMBER : INK;
       const rk = x.rank, rp = rk ? clamp((tt - R.B4 - (rk - 1) * 150) / 420, 0, 1) : 0, keep = rk ? 1 : 1 - .8 * clamp((tt - R.B4) / 700, 0, 1), g = clamp((tt - B3 + 300) / 300, 0, 1);
       ctx.strokeStyle = rgba(SILVER, .07 * g * keep * A); ctx.lineWidth = DPR; poly(P, cnt); ctx.stroke();
       const p = clamp((tt - B3) / Math.max(1, n.arr - B3), 0, 1), fi = cnt * p, m = Math.floor(fi);
@@ -370,15 +394,15 @@ const Holo = (() => {
         const mm = Math.max(1, Math.round(cnt * E.inOut(rp)));
         if (rk === 1) { ctx.strokeStyle = rgba(CORAL, .14 * A); ctx.lineWidth = 7 * DPR; poly(P, mm); ctx.stroke(); }
         ctx.strokeStyle = rgba(CORAL, (rk === 1 ? .95 : .5) * A); ctx.lineWidth = (rk === 1 ? 2.1 : 1.3) * DPR; poly(P, mm); ctx.stroke();
-        if (rk === 1 && rp >= 1 && !REDUCED) { const u = ((tt - R.B4 - 420) % 2600) / 2600, i = Math.floor(E.inOut(u) * cnt), j0 = Math.max(0, i - 7); if (i > j0) { ctx.strokeStyle = "rgba(255,226,220," + .95 * A + ")"; ctx.lineWidth = 2.4 * DPR; poly(P, i, j0); ctx.stroke(); } }
+        if (rk === 1 && rp >= 1 && !REDUCED) { const u = ((tt - R.B4 - 420) % 2600) / 2600, i = Math.floor(E.inOut(u) * cnt), j0 = Math.max(0, i - 7); if (i > j0) { ctx.strokeStyle = rgba(PAL.pulse, .95 * A); ctx.lineWidth = 2.4 * DPR; poly(P, i, j0); ctx.stroke(); } }
       }
     }
     for (const n of S.nodes) drawResNode(n, t, tt);
     for (const n of S.nodes) if (n.h) drawLab(n, n.labR, la * nodeIn(n, t), tt, nameColor(n, tt));
     if (R.racers.length && tt >= B3 - 200 && tt <= R.B4 + 1500) {
       const a = A * clamp((tt - B3 + 200) / 300, 0, 1) * (1 - clamp((tt - R.B4 - 1000) / 500, 0, 1)), mins = clamp((tt - B3) / R.rate, 0, R.maxMin);
-      text("경과 " + Math.floor(mins) + "분", W - 18 * DPR, H - 58 * DPR, "600 " + 15 * DPR + "px " + FONT, WHITE, .95 * a, "right");
-      text("실제 소요 시간 비율 · 1분 = " + String(+(R.rate / 1000).toFixed(2)) + "초", W - 18 * DPR, H - 40 * DPR, "500 " + 10 * DPR + "px " + MONO, WHITE, .45 * a, "right");
+      text("경과 " + Math.floor(mins) + "분", W - 18 * DPR, H - 58 * DPR, "600 " + 15 * DPR + "px " + FONT, INK, .95 * a, "right");
+      text("실제 소요 시간 비율 · 1분 = " + String(+(R.rate / 1000).toFixed(2)) + "초", W - 18 * DPR, H - 40 * DPR, "500 " + 10 * DPR + "px " + MONO, INK, .45 * a, "right");
     }
   }
   function drawFlat(t) {
@@ -435,25 +459,27 @@ const Holo = (() => {
   function updateTints(t) {
     const T = S.tint, R = S.res, tt = t - S.rt0; T.fill(0);
     S.nodes.slice(0, 16).forEach((n, i) => {
-      let c = [.84, .87, .93], a = S.na * nodeIn(n, t);
+      let c = PAL.tb, a = S.na * nodeIn(n, t);
       if (S.phase === "result" && R && n.h) {
         const x = n.h;
-        if (x.st === "out") { const p = clamp((tt - B1) / 450, 0, 1); c = mix3(c, [.5, .52, .56], p); a *= 1 - .65 * p; }
+        if (x.st === "out") { const p = clamp((tt - B1) / 450, 0, 1); c = mix3(c, PAL.tg, p); a *= 1 - .65 * p; }
         else {
-          if (x.chk) c = mix3(c, [.91, .7, .37], clamp((tt - B2) / 450, 0, 1));
-          if (x.rank) { const p = clamp((tt - R.B4 - (x.rank - 1) * 150) / 450, 0, 1); c = mix3(c, [1, .48, .42], p); a *= 1 + .3 * p; }
+          if (x.chk) c = mix3(c, PAL.ta, clamp((tt - B2) / 450, 0, 1));
+          if (x.rank) { const p = clamp((tt - R.B4 - (x.rank - 1) * 150) / 450, 0, 1); c = mix3(c, PAL.tc, p); a *= 1 + .3 * p; }
         }
       }
       T[i * 4] = c[0]; T[i * 4 + 1] = c[1]; T[i * 4 + 2] = c[2]; T[i * 4 + 3] = a;
     });
   }
   function drawGL(t) {
-    const { gl, P } = G2, ts = t / 1000, k = kd();
+    const { gl, P } = G2, ts = t / 1000, k = kd(), lt = THEME === "light" ? 1 : 0;
     gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    G2.draw(P.back, G2.quad, 8, gl.TRIANGLES, 3, { uRes: [W, H], uC: [cx, cy], uFC: S.o2, uKC: proj(KC[0], KC[1]), uSil: silR(), uGA: G.alpha * G.intro, uFA: F.alpha * C.alpha, uFR: fieldR(), uKA: C.alpha * (1 - S.lz), uKR: Math.min(W, H) * .6 });
-    if (C.alpha > .004 && bufK) G2.draw(P.kmap, bufK, 24, gl.POINTS, KP.length / 6, { uRes: [W, H], uC: [cx, cy], uLL: [C.lat, C.lng], uK: [Math.cos(C.lat * D2R) * 111.32 * k, 110.574 * k], uAlpha: C.alpha, uDPR: DPR, uTime: ts });
-    if (G.alpha > .004) G2.draw(P.globe, bufG, 28, gl.POINTS, GP.length / 7, { uRot: MG, uB0: BA, uB1: BB, uRes: [W, H], uCenter: [cx, cy], uLight: LIGHT, uF: focal(), uDist: G.dist, uDPR: DPR, uTime: ts, uAlpha: G.alpha, uIntro: G.intro, uFP: G.fp });
-    if (F.alpha > .004 && FP && bufF) G2.draw(P.field, bufF, 32, gl.POINTS, FP.length / 8, { uRes: [W, H], uCenter: S.o2, uK: k, uTime: ts, uAlpha: F.alpha * C.alpha, uBloom: F.bloom, uDPR: DPR, uWob: S.ring ? S.ring.step * .006 : 0, "uTint[0]": S.tint });
+    // 다크는 점이 겹칠수록 밝아지게(더하기), 라이트는 먹이 쌓이듯 짙어지게(덮어 그리기) 섞습니다.
+    gl.blendFunc(gl.ONE, lt ? gl.ONE_MINUS_SRC_ALPHA : gl.ONE);
+    G2.draw(P.back, G2.quad, 8, gl.TRIANGLES, 3, { uRes: [W, H], uC: [cx, cy], uFC: S.o2, uKC: proj(KC[0], KC[1]), uSil: silR(), uGA: G.alpha * G.intro, uFA: F.alpha * C.alpha, uFR: fieldR(), uKA: C.alpha * (1 - S.lz), uKR: Math.min(W, H) * .6, uTheme: lt });
+    if (C.alpha > .004 && bufK) G2.draw(P.kmap, bufK, 24, gl.POINTS, KP.length / 6, { uRes: [W, H], uC: [cx, cy], uLL: [C.lat, C.lng], uK: [Math.cos(C.lat * D2R) * 111.32 * k, 110.574 * k], uAlpha: C.alpha, uDPR: DPR, uTime: ts, uInk: PAL.glInk, uTheme: lt });
+    if (G.alpha > .004) G2.draw(P.globe, bufG, 28, gl.POINTS, GP.length / 7, { uRot: MG, uB0: BA, uB1: BB, uRes: [W, H], uCenter: [cx, cy], uLight: LIGHT, uF: focal(), uDist: G.dist, uDPR: DPR, uTime: ts, uAlpha: G.alpha, uIntro: G.intro, uFP: G.fp, uInk: PAL.glInk, uHot: PAL.glHot, uTheme: lt });
+    if (F.alpha > .004 && FP && bufF) G2.draw(P.field, bufF, 32, gl.POINTS, FP.length / 8, { uRes: [W, H], uCenter: S.o2, uK: k, uTime: ts, uAlpha: F.alpha * C.alpha, uBloom: F.bloom, uDPR: DPR, uWob: S.ring ? S.ring.step * .006 : 0, "uTint[0]": S.tint, uInk: PAL.glInk, uTheme: lt });
   }
   // 2D 대체: 한반도 점은 전국 배율로 한 번 그려 두고 확대·이동만 합니다.
   function buildKoff() {
@@ -461,7 +487,7 @@ const Holo = (() => {
     const x0 = (lon0 - KC[1]) * cs - 2, y0 = -(lat0 + gh * dla - KC[0]) * ky - 2, c = document.createElement("canvas");
     c.width = Math.ceil(w * dlo * cs) + 4; c.height = Math.ceil(gh * dla * ky) + 4;
     const g = c.getContext("2d"), r = mulberry32(36127);
-    for (let i = 0; i < gh; i++) for (let j = 0; j < w; j++) { const v = m[i * w + j]; if (!v) continue; g.fillStyle = v === 1 ? "rgba(214,221,235," + (.3 + .2 * r()).toFixed(2) + ")" : "rgba(214,221,235,.08)"; g.fillRect((lon0 + (j + .5) * dlo - KC[1]) * cs - x0 - .6, -(lat0 + (i + .5) * dla - KC[0]) * ky - y0 - .6, 1.2, 1.2); }
+    for (let i = 0; i < gh; i++) for (let j = 0; j < w; j++) { const v = m[i * w + j]; if (!v) continue; g.fillStyle = v === 1 ? rgba(PAL.dots, (.3 + .2 * r()).toFixed(2)) : rgba(PAL.dots, .08); g.fillRect((lon0 + (j + .5) * dlo - KC[1]) * cs - x0 - .6, -(lat0 + (i + .5) * dla - KC[0]) * ky - y0 - .6, 1.2, 1.2); }
     KOFF = { c, kref, x0, y0 };
   }
   function draw2D(t) {
@@ -473,7 +499,7 @@ const Holo = (() => {
         const sc = 1 + (1 - G.intro) * 2, den = Math.max(G.dist - vz * sc, .06), s = f / den, px = vx * sc * s, py = vy * sc * s;
         const occ = vz < hz && Math.hypot(px, py) < sil; let a = kind < .5 ? .5 : kind < 1.5 ? .2 : kind < 2.5 ? .3 * Math.pow(1 - Math.abs(vz), 3) : .9;
         if (occ) a *= .1; a *= G.alpha;
-        ctx.fillStyle = kind > 4.5 ? rgba([255, 153, 133], a) : "rgba(214,221,235," + a + ")"; const sz = (kind > 4.5 ? 2 : 1.3) * DPR; ctx.fillRect(cx + px - sz / 2, cy - py - sz / 2, sz, sz);
+        ctx.fillStyle = rgba(kind > 4.5 ? PAL.hot : PAL.dots, a); const sz = (kind > 4.5 ? 2 : 1.3) * DPR; ctx.fillRect(cx + px - sz / 2, cy - py - sz / 2, sz, sz);
       }
     }
     if (KOFF && C.alpha > .01) {
@@ -484,7 +510,7 @@ const Holo = (() => {
       const o = S.o2, k = kd(), T = S.tint;
       for (let i = 0; i < FP.length; i += 16) {
         const b = clamp((F.bloom - FP[i + 6] * .55) / .45, 0, 1), e = 1 - Math.pow(1 - b, 3), kind = FP[i + 4];
-        let c = [214, 221, 235], a = (kind < .5 ? .4 : kind < 1.5 ? .5 : .18) * F.alpha * C.alpha * e;
+        let c = PAL.dots, a = (kind < .5 ? .4 : kind < 1.5 ? .5 : .18) * F.alpha * C.alpha * e;
         if (kind > .5 && kind < 1.5) { const gi = Math.min(15, FP[i + 5]) * 4; c = [Math.round(T[gi] * 255), Math.round(T[gi + 1] * 255), Math.round(T[gi + 2] * 255)]; a *= T[gi + 3]; }
         ctx.fillStyle = rgba(c, a); ctx.fillRect(o[0] + FP[i] * e * k - DPR / 2, o[1] - FP[i + 1] * e * k - DPR / 2, 1.3 * DPR, 1.3 * DPR);
       }
@@ -673,6 +699,7 @@ const Holo = (() => {
     onPick: f => { S.pick = f; },
     onBeat: f => { S.onBeat = f; },
     hasGL: () => !!G2,
+    setTheme,
     phase: () => S.phase
   };
 })();

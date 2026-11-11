@@ -214,7 +214,23 @@ function makeStore() {
     return next(action);
   });
 }
-const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "#dfe2e7", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "rgba(255,255,255,.06)", bubbleFromUserBorderColor: "rgba(255,255,255,.12)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 14, bubbleFromUserTextColor: "#eef0f3", subtle: "#8a8f99", accent: "#ff7b6b", timestampColor: "#5d626c", paddingRegular: 10, paddingWide: 12 };
+// Web Chat 색은 CSS 변수로 넘깁니다. 테마를 바꿔도 Web Chat을 다시 그리지 않고 대화가 그대로 남습니다.
+const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "var(--wc-text)", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "var(--wc-user-bg)", bubbleFromUserBorderColor: "var(--wc-user-line)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 14, bubbleFromUserTextColor: "var(--ink)", subtle: "var(--muted)", accent: "var(--coral)", timestampColor: "var(--dim)", paddingRegular: 10, paddingWide: 12 };
+
+// 테마: 기본은 다크, 오른쪽 위 토글로 라이트. 고른 테마는 이 브라우저에 저장합니다(주소에 ?theme=light|dark가 있으면 그쪽이 먼저).
+const THEME_BG = { dark: "#07080b", light: "#f4f3f0" };
+const curTheme = () => document.documentElement.dataset.theme === "light" ? "light" : "dark";
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t; $('meta[name="theme-color"]').content = THEME_BG[t];
+  const b = $("#themeBtn"); b.setAttribute("aria-checked", String(t === "light")); b.title = t === "light" ? "다크 모드로 보기" : "라이트 모드로 보기";
+  Holo.setTheme(t);
+}
+function toggleTheme() {
+  const t = curTheme() === "light" ? "dark" : "light";
+  try { localStorage.setItem("gtr-theme", t); } catch (e) { }
+  if (/[?&]theme=/.test(location.search)) { const u = new URL(location.href); u.searchParams.set("theme", t); history.replaceState(null, "", u); }
+  if (document.startViewTransition && !REDUCED) document.startViewTransition(() => applyTheme(t)); else applyTheme(t);
+}
 
 Pipe.onStage(App.onStage);
 Holo.onBeat((k, info) => { if (App.turn) return; const x = BEAT_HUD[k](info); setHud(x[0], x[1]); });
@@ -226,8 +242,9 @@ q.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.
 sendBtn.addEventListener("click", () => submit());
 $("#demoBtn").addEventListener("click", runDemo);
 $("#newBtn").addEventListener("click", () => location.reload());
+$("#themeBtn").addEventListener("click", toggleTheme);
 document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); } });
 setInterval(() => { const d = new Date(); $("#clock").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) + (d.getTimezoneOffset() === -540 ? " KST" : ""); }, 1000);
-renderChips(); Rank.empty(); setCoord(null); setMeta(IDLE_META); refresh();
+applyTheme(curTheme()); renderChips(); Rank.empty(); setCoord(null); setMeta(IDLE_META); refresh();
 const DM = location.search.match(/[?&]demo(?:=(\d+))?/);
 if (DM) setTimeout(() => runDemo(DM[1] ? +DM[1] - 1 : 0), 700);

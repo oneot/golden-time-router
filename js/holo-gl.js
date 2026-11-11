@@ -108,8 +108,8 @@ function buildFieldPoints(nodes, step, rings, kCss, seed) {
 const GLSL = {
   globeVS: `precision highp float;
 attribute vec3 aPos; attribute vec4 aMeta;
-uniform mat3 uRot, uB0, uB1; uniform vec2 uRes, uCenter; uniform vec3 uLight;
-uniform float uF, uDist, uDPR, uTime, uAlpha, uIntro, uFP;
+uniform mat3 uRot, uB0, uB1; uniform vec2 uRes, uCenter; uniform vec3 uLight, uInk, uHot;
+uniform float uF, uDist, uDPR, uTime, uAlpha, uIntro, uFP, uTheme;
 varying vec3 vCol; varying float vA, vSoft;
 void main() {
   float size = aMeta.x, kind = aMeta.y, seed = aMeta.z, env = 1.0, edge = 0.0;
@@ -139,13 +139,14 @@ void main() {
   float hz = mix(0.0, 1.0 / uDist, smoothstep(2.2, 1.4, uDist));
   float occl = (v.z < hz && length(sp) < sil && (kind < 3.5 || kind > 4.5)) ? 1.0 : 0.0;
   float lam = max(dot(n, uLight), 0.0), rim = pow(1.0 - abs(n.z), 2.0), a;
-  vec3 col = vec3(0.84, 0.87, 0.93);
-  if (kind < 0.5) a = 0.2 + 0.52 * lam + 0.3 * rim;
-  else if (kind < 1.5) a = 0.06 + 0.12 * lam + 0.16 * rim;
-  else if (kind < 2.5) a = 0.5 * pow(rim, 1.5);
-  else if (kind < 3.5) a = (0.085 + 0.24 * edge) * env * (0.65 + 0.45 * lam);
-  else if (kind < 4.5) a = 0.32;
-  else { a = 0.9 * (0.78 + 0.22 * sin(uTime * 1.7 + seed * 40.0)); col = vec3(1.0, 0.6, 0.52); }
+  // 다크: 은색 점이 빛을 받는 쪽에서 밝아집니다. 라이트: 먹색 점이 그늘 쪽과 가장자리에서 짙어집니다(연필 음영).
+  vec3 col = uInk; bool lt = uTheme > 0.5; float sh = 1.0 - lam;
+  if (kind < 0.5) a = lt ? 0.22 + 0.26 * sh + 0.08 * rim : 0.2 + 0.52 * lam + 0.3 * rim;
+  else if (kind < 1.5) a = lt ? 0.06 + 0.08 * sh + 0.05 * rim : 0.06 + 0.12 * lam + 0.16 * rim;
+  else if (kind < 2.5) a = 0.5 * pow(rim, 1.5) * (lt ? 0.12 : 1.0);
+  else if (kind < 3.5) a = (0.085 + 0.24 * edge) * env * (lt ? 0.6 + 0.3 * sh : 0.65 + 0.45 * lam);
+  else if (kind < 4.5) a = lt ? 0.06 : 0.32;
+  else { a = 0.9 * (0.78 + 0.22 * sin(uTime * 1.7 + seed * 40.0)); col = uHot; }
   if (kind < 3.5) a *= 0.86 + 0.14 * sin(uTime * (0.5 + fract(seed * 3.1)) + seed * 40.0);
   // 가까이 내려가면 점 사이 간격이 벌어져 격자처럼 보이므로, 간격(px)이 커지는 만큼 육지·바다·대기 점을 지웁니다.
   if (kind < 2.5) a *= 1.0 - smoothstep(3.5 * uDPR, 9.0 * uDPR, uF / den * 0.0095);
@@ -166,7 +167,7 @@ void main() {
 }`,
   kmapVS: `precision highp float;
 attribute vec4 aP; attribute vec2 aE;
-uniform vec2 uRes, uC, uLL, uK; uniform float uAlpha, uDPR, uTime;
+uniform vec2 uRes, uC, uLL, uK; uniform vec3 uInk; uniform float uAlpha, uDPR, uTime, uTheme;
 varying vec3 vCol; varying float vA, vSoft;
 void main() {
   float kind = aP.z, seed = aP.w, edge = aE.x;
@@ -174,20 +175,20 @@ void main() {
   float cell = 0.02 * uK.y;
   // 확대되면 0.02도 격자가 드러나기 전에 지우고, 멀리서 점이 겹쳐 하얗게 뭉치면 면적만큼 옅게 합니다.
   float fade = (1.0 - smoothstep(2.6 * uDPR, 6.5 * uDPR, cell)) * min(1.0, pow(cell / (1.5 * uDPR), 2.0));
-  float a = kind < 1.5 ? (0.26 + 0.2 * seed) * (1.0 + 0.85 * edge) : 0.06 + 0.05 * seed;
+  float a = kind < 1.5 ? (0.26 + 0.2 * seed) * (1.0 + 0.85 * edge) * (uTheme > 0.5 ? 0.8 : 1.0) : (0.06 + 0.05 * seed) * (uTheme > 0.5 ? 0.8 : 1.0);
   // 북한·중국·일본은 격자 경계(북위 32~40.2도, 동경 123~132도)에서 잘려 보이지 않게 가장자리로 갈수록 옅게
   vec2 g = abs((aP.xy - vec2(36.11, 127.5)) / vec2(4.11, 4.5));
   if (kind > 1.5) a *= 1.0 - smoothstep(0.62, 0.97, max(g.x, g.y));
   a *= fade * uAlpha * (0.88 + 0.12 * sin(uTime * 0.7 + seed * 50.0));
   float px = clamp(cell * 0.4, uDPR, 2.6 * uDPR);
   if (px < 1.5) { a *= px / 1.5; px = 1.5; }
-  gl_PointSize = px; vA = a; vCol = vec3(0.84, 0.87, 0.93); vSoft = 0.45;
+  gl_PointSize = px; vA = a; vCol = uInk; vSoft = 0.45;
   gl_Position = vec4(q.x / uRes.x * 2.0 - 1.0, 1.0 - q.y / uRes.y * 2.0, 0.0, 1.0);
   if (fade * uAlpha < 0.002) gl_Position = vec4(3.0, 3.0, 0.0, 1.0);
 }`,
   fieldVS: `precision highp float;
 attribute vec4 aA; attribute vec4 aB;
-uniform vec2 uRes, uCenter; uniform float uK, uTime, uAlpha, uBloom, uDPR, uWob;
+uniform vec2 uRes, uCenter; uniform vec3 uInk; uniform float uK, uTime, uAlpha, uBloom, uDPR, uWob, uTheme;
 uniform vec4 uTint[16];
 varying vec3 vCol; varying float vA, vSoft;
 void main() {
@@ -200,10 +201,12 @@ void main() {
   float b = clamp((uBloom - delay * 0.55) / 0.45, 0.0, 1.0), e = 1.0 - pow(1.0 - b, 3.0);
   p *= mix(0.08, 1.0, e);
   vec2 q = uCenter + vec2(p.x, -p.y) * uK;
-  vec3 col = vec3(0.84, 0.87, 0.93); float am = 1.0;
+  vec3 col = uInk; float am = 1.0;
   if (kind > 0.5 && kind < 1.5) { vec4 tc = uTint[int(clamp(grp, 0.0, 15.0) + 0.5)]; col = mix(col, tc.rgb, core > 0.5 ? 1.0 : 0.4); am = tc.a; }
-  float a = (kind < 0.5 ? 0.34 : kind < 1.5 ? 0.46 : 0.16) * am;
+  float a = (kind < 0.5 ? 0.34 : kind < 1.5 ? 0.46 : 0.16) * am * (uTheme > 0.5 ? (kind < 0.5 ? 0.62 : kind < 1.5 ? 0.9 : 0.3) : 1.0);
   float dep = fract(seed * 17.31), blur = dep > 0.93 ? (dep - 0.93) * 12.0 : 0.0;
+  // 라이트에서는 초점 밖 큰 점이 종이 위 얼룩처럼 보이므로 거의 지웁니다.
+  if (uTheme > 0.5) a *= 1.0 - 0.85 * clamp(blur, 0.0, 1.0);
   float px = size * uDPR * (1.0 + 2.0 * blur);
   a /= 1.0 + 2.0 * blur * blur;
   if (px < 1.5) { a *= px / 1.5; px = 1.5; }
@@ -221,28 +224,29 @@ void main() {
 }`,
   backVS: `attribute vec2 aQ; void main() { gl_Position = vec4(aQ, 0.0, 1.0); }`,
   backFS: `precision mediump float;
-uniform vec2 uRes, uC, uFC, uKC; uniform float uSil, uGA, uFA, uFR, uKA, uKR;
+uniform vec2 uRes, uC, uFC, uKC; uniform float uSil, uGA, uFA, uFR, uKA, uKR, uTheme;
 void main() {
   vec2 p = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   vec3 col = vec3(0.0); float a = 0.0;
   if (uGA > 0.001) {
     vec2 q = (p - uC) / uSil; float d = length(q);
     float lit = clamp(0.5 + 0.5 * dot(q, vec2(-0.55, -0.62)), 0.0, 1.0);
-    float body = (1.0 - smoothstep(0.97, 1.0, d)) * (0.012 + 0.03 * lit * lit * (1.0 - d * d * 0.5));
-    float rim = exp(-pow((d - 1.0) / 0.012, 2.0)) * 0.05;
-    float haze = d > 1.0 ? exp(-(d - 1.0) * 4.5) * 0.05 : 0.0;
+    // 다크는 빛을 받은 쪽이 밝은 구, 라이트는 그늘 쪽이 옅게 어두운 구(종이 위 연필 음영)
+    float body = (1.0 - smoothstep(0.97, 1.0, d)) * mix(0.012 + 0.03 * lit * lit * (1.0 - d * d * 0.5), 0.018 + 0.05 * (1.0 - lit) * (1.0 - lit), uTheme);
+    float rim = exp(-pow((d - 1.0) / 0.012, 2.0)) * mix(0.05, 0.035, uTheme);
+    float haze = d > 1.0 ? exp(-(d - 1.0) * 4.5) * mix(0.05, 0.02, uTheme) : 0.0;
     float g = (body + rim + haze) * uGA;
-    col += vec3(0.8, 0.84, 0.95) * g; a += g;
+    col += mix(vec3(0.8, 0.84, 0.95), vec3(0.2, 0.22, 0.28), uTheme) * g; a += g;
   }
   if (uKA > 0.001) {
     float d = length(p - uKC) / uKR;
-    float g = exp(-d * d * 1.6) * 0.05 * uKA;
-    col += vec3(0.78, 0.82, 0.95) * g; a += g;
+    float g = exp(-d * d * 1.6) * mix(0.05, 0.03, uTheme) * uKA;
+    col += mix(vec3(0.78, 0.82, 0.95), vec3(0.3, 0.32, 0.38), uTheme) * g; a += g;
   }
   if (uFA > 0.001) {
     float d = length(p - uFC) / uFR;
-    float g = (exp(-d * d * 2.6) * 0.055 + exp(-d * d * 18.0) * 0.05) * uFA;
-    col += vec3(1.0, 0.66, 0.58) * g; a += g;
+    float g = (exp(-d * d * 2.6) * 0.055 + exp(-d * d * 18.0) * 0.05) * uFA * mix(1.0, 0.55, uTheme);
+    col += mix(vec3(1.0, 0.66, 0.58), vec3(0.9, 0.5, 0.38), uTheme) * g; a += g;
   }
   gl_FragColor = vec4(col, a);
 }`

@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>골든타임 라우터 · Golden Time Router</title>
 <meta name="description" content="장소와 환자 상황을 말하면 주변 응급실의 실시간 병상과 도로 이동 시간으로 상위 3곳을 추천하는 Copilot Studio 에이전트 대시보드">
 <meta name="theme-color" content="#07080b">
+<script>
+  // 테마: 기본은 다크. 주소의 ?theme=light|dark, 없으면 이 브라우저에 저장한 선택을 따릅니다. 첫 화면이 깜빡이지 않게 CSS보다 먼저 정합니다.
+  (() => { let t = new URLSearchParams(location.search).get("theme"); if (t !== "light" && t !== "dark") { try { t = localStorage.getItem("gtr-theme"); } catch (e) { t = null; } } if (t === "light") { document.documentElement.dataset.theme = "light"; document.querySelector('meta[name="theme-color"]').content = "#f4f3f0"; } })();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,7 +19,7 @@
 <!--
   골든타임 라우터 v2.1 · 파일 구성
   config.js          ✏️ 학생이 바꾸는 유일한 파일 (agent-seal에서 만든 BROKER_URL · SEALED 두 줄)
-  css/style.css      화면 디자인
+  css/style.css      화면 디자인 (다크 기본 · 라이트는 오른쪽 위 토글)
   data/land.js       지구본 육지(0.25도 격자)      data/korea.js   한반도 점 지도(Natural Earth 10m)
   data/er.js         전국 응급실 530곳 위치(국립중앙의료원)      data/demo.js   샘플 시연 기록 4건
   js/utils.js        공통 함수 · 에이전트 답 읽기
@@ -45,12 +49,13 @@
 <div class="app">
   <header class="top" style="--i:0">
     <a class="brand" href="./" aria-label="골든타임 라우터 처음 화면">
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="none" stroke="#d6dbe4" stroke-opacity=".45" stroke-width="1"/><ellipse cx="16" cy="16" rx="12.5" ry="4.6" fill="none" stroke="#d6dbe4" stroke-opacity=".22" stroke-width="1"/><path d="M8.6 20.6C11.6 13.4 17 9.6 23 9.2" fill="none" stroke="#ff7b6b" stroke-width="1.6" stroke-linecap="round"/><circle cx="23.2" cy="9.2" r="2.6" fill="none" stroke="#ff7b6b" stroke-width="1.3"/><circle cx="8.6" cy="20.6" r="1.6" fill="#fff"/></svg>
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><circle class="mk-l" cx="16" cy="16" r="12.5" fill="none" stroke="#d6dbe4" stroke-opacity=".45" stroke-width="1"/><ellipse class="mk-l" cx="16" cy="16" rx="12.5" ry="4.6" fill="none" stroke="#d6dbe4" stroke-opacity=".22" stroke-width="1"/><path class="mk-c" d="M8.6 20.6C11.6 13.4 17 9.6 23 9.2" fill="none" stroke="#ff7b6b" stroke-width="1.6" stroke-linecap="round"/><circle class="mk-c" cx="23.2" cy="9.2" r="2.6" fill="none" stroke="#ff7b6b" stroke-width="1.3"/><circle class="mk-o" cx="8.6" cy="20.6" r="1.6" fill="#fff"/></svg>
       <span class="brand-txt"><b>Golden Time Router</b><span>골든타임 라우터 · 실시간 응급실 이송 추천</span></span>
     </a>
     <span class="grow"></span>
     <span class="status" id="linkPill"><i></i><span id="linkText">연결 중</span></span>
     <span class="clock hide-sm" id="clock">--:--:--</span>
+    <button class="tgl" id="themeBtn" type="button" role="switch" aria-checked="false" aria-label="라이트 모드" title="라이트 모드로 보기"><span class="tgl-k" aria-hidden="true"></span><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.8 14.6A8.2 8.2 0 0 1 9.4 4.2a8.2 8.2 0 1 0 10.4 10.4Z"/></svg><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M12 3.2v1.9M12 18.9v1.9M5.8 5.8l1.3 1.3M16.9 16.9l1.3 1.3M3.2 12h1.9M18.9 12h1.9M5.8 18.2l1.3-1.3M16.9 7.1l1.3-1.3"/></svg></button>
     <button class="btn" id="demoBtn" type="button">샘플 시연</button>
     <button class="btn" id="newBtn" type="button">새 대화</button>
   </header>
