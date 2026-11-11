@@ -5,11 +5,11 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const TAU = Math.PI * 2, D2R = Math.PI / 180;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const now = () => performance.now();
-const E = { out: t => 1 - Math.pow(1 - t, 3), inOut: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, in: t => t * t * t, back: t => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2) };
+const E = { out: t => 1 - Math.pow(1 - t, 3), out5: t => 1 - Math.pow(1 - t, 5), inOut: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, in: t => t * t * t, sine: t => .5 - .5 * Math.cos(Math.PI * t), back: t => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2) };
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const MOBILE = () => matchMedia("(max-width: 760px)").matches;
 const FONT = "'Pretendard Variable', Pretendard, -apple-system, sans-serif";
-const MONO = "'JetBrains Mono', ui-monospace, Menlo, monospace";
+const MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 const pad2 = n => String(n).padStart(2, "0");
 const fmtT = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return pad2(Math.floor(s / 60)) + ":" + pad2(s % 60); };
 const fmtKm = k => k < 1 ? Math.round(k * 1000) + "m" : Math.round(k * 10) / 10 + "km";
@@ -30,7 +30,8 @@ function shortName(n) {
 const ST = { "추천": "rec", "대안": "alt", "보류": "hold", "제외": "out" };
 const ST_TXT = { rec: "추천", alt: "대안", hold: "보류", out: "제외" };
 const ST_ORDER = { rec: 0, alt: 1, hold: 2, out: 3 };
-const COL = { rec: [34, 211, 238], alt: [167, 139, 250], hold: [251, 191, 36], out: [251, 113, 133], origin: [244, 114, 182] };
+// 지도 색: 강조는 코랄 하나, 나머지는 은색 계열로 절제합니다.
+const COL = { rec: [255, 123, 107], alt: [214, 219, 228], hold: [233, 179, 95], out: [128, 133, 143], origin: [255, 255, 255], ink: [7, 8, 11] };
 
 // 병원 목록을 화면에서 쓰는 모양으로 정리합니다(순위 1~3 다시 매기기, 출발지에서 직선거리 계산).
 function normalize(d) {
@@ -171,6 +172,19 @@ function readAnswer(text) {
   return { text: r.text, changed: r.changed, data: normalize(d) };
 }
 
-// 지구본 육지 점: data/land.js의 비트맵을 풀어 위도·경도가 육지인지 알려 줍니다.
-const LANDBITS = (() => { const s = atob(LAND), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; })();
-function isLand(lat, lon) { const i = clamp(Math.floor((lon + 180) / 1.5), 0, 239), j = clamp(Math.floor((90 - lat) / 1.5), 0, 119), k = j * 240 + i; return (LANDBITS[k >> 3] >> (7 - (k & 7))) & 1; }
+// 지구본 육지: data/land.js의 줄별 길이(바다·육지 번갈아)를 풀어 위도·경도가 육지인지 알려 줍니다.
+const LANDMAP = (() => {
+  const { w, h, rle } = LAND, s = atob(rle), m = new Uint8Array(w * h);
+  let k = 0;
+  for (let j = 0; j < h; j++) {
+    let x = 0, land = 0;
+    while (x < w && k < s.length) {
+      let n = 0, sh = 0, b;
+      do { b = s.charCodeAt(k++); n |= (b & 127) << sh; sh += 7; } while (b & 128);
+      if (land) m.fill(1, j * w + x, j * w + x + n);
+      x += n; land ^= 1;
+    }
+  }
+  return m;
+})();
+function isLand(lat, lon) { const { w, h } = LAND, i = clamp(Math.floor((lon + 180) / 360 * w), 0, w - 1), j = clamp(Math.floor((90 - lat) / 180 * h), 0, h - 1); return LANDMAP[j * w + i]; }

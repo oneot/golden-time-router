@@ -1,6 +1,6 @@
 # 🚨 골든타임 라우터 · Golden Time Router
 
-장소와 환자 상황을 한 줄로 보내면 Copilot Studio 에이전트가 주변 응급실 10곳의 실시간 병상·수용 제한·도로 이동 시간을 비교해 상위 3곳을 추천합니다. 이 웹앱은 그 결과를 홀로그램 지도와 순위판으로 보여 줍니다.
+장소와 환자 상황을 한 줄로 보내면 Copilot Studio 에이전트가 주변 응급실 10곳의 실시간 병상·수용 제한·도로 이동 시간을 비교해 상위 3곳을 추천합니다. 이 웹앱은 그 결과를 점묘 지구본에서 출발지로 날아드는 실시간 지도와 순위판으로 보여 줍니다.
 
 - 웹앱: https://oneot.github.io/golden-time-router/
 
@@ -37,15 +37,17 @@ index.html         화면 뼈대
 config.js          ✏️ 학생이 바꾸는 유일한 파일 (BROKER_URL · SEALED)
 css/style.css      화면 디자인
 js/utils.js        공통 함수 · 에이전트 답 읽기
-js/background.js   배경 데이터 흐름
-js/holo-map.js     지구본 · 레이더 지도
-js/panels.js       분석 단계 · 순위판 · 하단 티커
+js/holo-gl.js      지도 그래픽 (WebGL 셰이더 · 지구본과 지도의 점 만들기)
+js/holo-map.js     실시간 지도 (지구본 → 출발지 지도 · 경로 · 병원 · 라벨)
+js/panels.js       분석 단계 · 추천 순위
 js/app.js          화면 흐름 · 샘플 시연 · 연결 안내
 js/chat.js         agent-seal 연결 (config.js를 매번 새로 불러와 Direct Line으로 연결)
 data/demo.js       샘플 시연 기록
-data/land.js       지구본 육지 점
+data/land.js       지구본 육지 (0.25도 격자)
 ```
+
+WebGL을 쓸 수 없는 브라우저에서는 지도를 2D로 줄여 그리고, '동작 줄이기' 설정이 켜져 있으면 애니메이션 없이 결과만 보여 줍니다.
 
 > 연구용 시뮬레이션입니다. 실제 이송 판단에 쓰지 않습니다. 병상과 메시지는 병원이 입력한 값이라 실제와 다를 수 있습니다.
 
-데이터: 국립중앙의료원 응급의료정보(공공데이터포털) · 카카오 로컬 · 카카오모빌리티 길찾기 · 지구본 윤곽: Natural Earth · v1.0
+데이터: 국립중앙의료원 응급의료정보(공공데이터포털) · 카카오 로컬 · 카카오모빌리티 길찾기 · 지구본 육지: Natural Earth · 글꼴: Pretendard, Geist Mono · v2.0

@@ -5,22 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>골든타임 라우터 · Golden Time Router</title>
 <meta name="description" content="장소와 환자 상황을 말하면 주변 응급실의 실시간 병상과 도로 이동 시간으로 상위 3곳을 추천하는 Copilot Studio 에이전트 대시보드">
-<meta name="theme-color" content="#03040b">
+<meta name="theme-color" content="#07080b">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <!--
-  골든타임 라우터 v1.0 · 파일 구성
+  골든타임 라우터 v2.0 · 파일 구성
   config.js          ✏️ 학생이 바꾸는 유일한 파일 (agent-seal에서 만든 BROKER_URL · SEALED 두 줄)
   css/style.css      화면 디자인
-  data/land.js       지구본 육지 점      data/demo.js   샘플 시연 기록
+  data/land.js       지구본 육지(0.25도 격자)    data/demo.js   샘플 시연 기록
   js/utils.js        공통 함수 · 에이전트 답 읽기
-  js/background.js   배경 데이터 흐름
-  js/holo-map.js     지구본 · 레이더 지도
-  js/panels.js       분석 단계 · 순위판 · 하단 티커
+  js/holo-gl.js      지도 그래픽(WebGL 셰이더와 점 만들기)
+  js/holo-map.js     실시간 지도(지구본 → 출발지 지도, 경로·병원·라벨)
+  js/panels.js       분석 단계 · 추천 순위
   js/app.js          화면 흐름 · 샘플 시연 · 연결 안내
   js/chat.js         agent-seal 연결 (config.js를 불러와 Direct Line으로 연결)
 -->
@@ -28,111 +28,94 @@
 <script defer src="data/land.js"></script>
 <script defer src="data/demo.js"></script>
 <script defer src="js/utils.js"></script>
-<script defer src="js/background.js"></script>
+<script defer src="js/holo-gl.js"></script>
 <script defer src="js/holo-map.js"></script>
 <script defer src="js/panels.js"></script>
 <script defer src="js/app.js"></script>
 <script defer src="js/chat.js"></script>
 </head>
-<body>
-<canvas id="fx" aria-hidden="true"></canvas>
-<div class="fx-vig" aria-hidden="true"></div>
-<div class="fx-scan" aria-hidden="true"></div>
-
-<div class="boot" id="boot" aria-hidden="true">
-  <div class="boot-in">
-    <svg class="boot-ring" viewBox="0 0 96 96"><circle cx="48" cy="48" r="44" fill="none" stroke="#8ff3ff" stroke-opacity=".18"/><g class="r1"><circle cx="48" cy="48" r="36" fill="none" stroke="#22d3ee" stroke-width="2.5" stroke-dasharray="40 14 8 14" stroke-linecap="round"/></g><g class="r2"><circle cx="48" cy="48" r="26" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="4 7"/></g><path d="M48 37v22M37 48h22" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
-    <div class="boot-log" id="bootLog"></div>
-    <div class="boot-bar"><i></i></div>
-  </div>
-</div>
+<body class="is-loading">
+<div class="grain" aria-hidden="true"></div>
 
 <div class="app">
-  <header class="top">
-    <div class="brand">
-      <svg class="logo" viewBox="0 0 42 42" aria-hidden="true"><defs><linearGradient id="lgA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8ff3ff"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><circle cx="21" cy="21" r="19.5" fill="none" stroke="url(#lgA)" stroke-opacity=".35"/><g class="r1"><circle cx="21" cy="21" r="15" fill="none" stroke="url(#lgA)" stroke-width="2" stroke-dasharray="18 8 4 8" stroke-linecap="round"/></g><g class="r2"><circle cx="21" cy="21" r="10.5" fill="none" stroke="#22d3ee" stroke-opacity=".7" stroke-dasharray="3 5"/></g><path d="M21 15v12M15 21h12" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="21" cy="21" r="2.4" fill="#f472b6"/></svg>
-      <div>
-        <h1>GOLDEN TIME ROUTER</h1>
-        <p>골든타임 라우터 · 실시간 응급실 이송 추천</p>
-      </div>
-    </div>
+  <header class="top" style="--i:0">
+    <a class="brand" href="./" aria-label="골든타임 라우터 처음 화면">
+      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="none" stroke="#d6dbe4" stroke-opacity=".45" stroke-width="1"/><ellipse cx="16" cy="16" rx="12.5" ry="4.6" fill="none" stroke="#d6dbe4" stroke-opacity=".22" stroke-width="1"/><path d="M8.6 20.6C11.6 13.4 17 9.6 23 9.2" fill="none" stroke="#ff7b6b" stroke-width="1.6" stroke-linecap="round"/><circle cx="23.2" cy="9.2" r="2.6" fill="none" stroke="#ff7b6b" stroke-width="1.3"/><circle cx="8.6" cy="20.6" r="1.6" fill="#fff"/></svg>
+      <span class="brand-txt"><b>Golden Time Router</b><span>골든타임 라우터 · 실시간 응급실 이송 추천</span></span>
+    </a>
     <span class="grow"></span>
-    <span class="pill link-pill" id="linkPill"><i></i><span id="linkText">LINK · CONNECTING</span></span>
-    <span class="pill hide-sm"><i></i>COPILOT STUDIO AGENT</span>
+    <span class="status" id="linkPill"><i></i><span id="linkText">연결 중</span></span>
     <span class="clock hide-sm" id="clock">--:--:--</span>
-    <button class="tbtn demo" id="demoBtn" type="button">샘플 시연</button>
-    <button class="tbtn" id="newBtn" type="button">새 대화</button>
+    <button class="btn" id="demoBtn" type="button">샘플 시연</button>
+    <button class="btn" id="newBtn" type="button">새 대화</button>
   </header>
 
-  <section class="panel mission" aria-labelledby="missionTitle">
-    <div class="ph"><b>01</b>Mission<span class="grow"></span></div>
-    <h2 class="m-title" id="missionTitle">어디에서, <em>어떤 환자</em>인가요?</h2>
-    <p class="m-sub">장소와 환자 상황을 한 줄로 보내면 주변 응급실 10곳의 실시간 병상·수용 제한·도로 이동 시간을 모아 상위 3곳을 고릅니다.</p>
-    <div class="composer">
-      <textarea id="q" rows="1" placeholder="예) 보라매공원, 50대 다리골절 노인" aria-label="장소와 환자 상황"></textarea>
-      <button class="send" id="send" type="button" aria-label="보내기" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
-    </div>
-    <p class="hint"><kbd>Enter</kbd> 보내기 · <kbd>Shift</kbd>+<kbd>Enter</kbd> 줄바꿈</p>
-    <div class="chips" id="chips"></div>
-    <div class="notice" id="notice" hidden></div>
-  </section>
+  <div class="side">
+    <section class="panel mission" style="--i:1" aria-labelledby="missionTitle">
+      <div class="ph"><span class="idx">01</span>요청</div>
+      <h2 class="m-title" id="missionTitle">어디에서, 어떤 환자인가요?</h2>
+      <p class="m-sub">장소와 환자 상황을 한 줄로 보내면 주변 응급실 10곳의 실시간 병상·수용 제한·도로 이동 시간을 모아 상위 3곳을 고릅니다.</p>
+      <div class="composer">
+        <textarea id="q" rows="1" placeholder="예) 보라매공원, 50대 다리골절 노인" aria-label="장소와 환자 상황"></textarea>
+        <button class="send" id="send" type="button" aria-label="보내기" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
+      </div>
+      <p class="hint"><kbd>Enter</kbd> 보내기 · <kbd>Shift</kbd> + <kbd>Enter</kbd> 줄바꿈</p>
+      <div class="chips" id="chips"></div>
+      <div class="notice" id="notice" hidden></div>
+    </section>
 
-  <section class="panel pipe" aria-label="분석 단계">
-    <div class="ph"><b>02</b>Pipeline<span class="grow"></span><span class="ph-r" id="elapsed">T+00:00</span></div>
-    <ol class="stages" id="stages">
-      <li><i></i><div><b>위치 확인</b><span>카카오 장소 검색</span></div><em></em></li>
-      <li><i></i><div><b>후보 응급실 10곳</b><span>국립중앙의료원 위치 기반 조회</span></div><em></em></li>
-      <li><i></i><div><b>실시간 병상·수용 제한</b><span>가용병상 · 중증질환 수용 · 제한 메시지</span></div><em></em></li>
-      <li><i></i><div><b>도로 이동 시간</b><span>카카오모빌리티 실시간 교통</span></div><em></em></li>
-      <li><i></i><div><b>AI 판단</b><span>에이전트 · 순위와 근거</span></div><em></em></li>
-    </ol>
-    <p class="pipe-note" id="pipeNote">워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다.</p>
-  </section>
+    <section class="panel pipe" style="--i:2" aria-label="분석 단계">
+      <div class="ph"><span class="idx">02</span>분석 단계<span class="grow"></span><span class="ph-r mono" id="elapsed">00:00</span></div>
+      <ol class="stages" id="stages">
+        <li><i></i><div><b>위치 확인</b><span>카카오 장소 검색</span></div><em></em></li>
+        <li><i></i><div><b>응급실 후보 10곳</b><span>국립중앙의료원 위치 기반 조회</span></div><em></em></li>
+        <li><i></i><div><b>실시간 병상·수용 제한</b><span>가용 병상 · 중증질환 수용 · 제한 메시지</span></div><em></em></li>
+        <li><i></i><div><b>도로 이동 시간</b><span>카카오모빌리티 실시간 교통</span></div><em></em></li>
+        <li><i></i><div><b>AI 판단</b><span>에이전트 · 순위와 근거</span></div><em></em></li>
+      </ol>
+      <p class="pipe-note" id="pipeNote">워크플로가 모은 실시간 데이터로 AI가 순위를 정합니다.</p>
+    </section>
 
-  <section class="panel brief" aria-label="AI 브리핑">
-    <div class="ph"><b>05</b>AI Briefing<span class="grow"></span></div>
-    <div class="brief-body">
-      <div id="webchat" role="log"></div>
-      <div class="demo-brief" id="demoBrief" hidden></div>
-    </div>
-  </section>
+    <section class="panel brief" style="--i:3" aria-label="AI 브리핑">
+      <div class="ph"><span class="idx">05</span>AI 브리핑</div>
+      <div class="brief-body">
+        <div id="webchat" role="log"></div>
+        <div class="demo-brief" id="demoBrief" hidden></div>
+      </div>
+    </section>
+  </div>
 
-  <section class="panel holo" id="holoPanel" aria-label="응급실 위치 지도">
+  <section class="stage" id="holoPanel" style="--i:1" aria-label="실시간 지도">
+    <canvas id="holoGL" aria-hidden="true"></canvas>
     <canvas id="holo"></canvas>
     <div class="hud hud-tl">
-      <div class="ph"><b>03</b>Holo Map</div>
-      <div class="hud-state" id="hudState">STANDBY</div>
-      <div class="hud-sub" id="hudSub">장소와 환자 상황을 기다리는 중</div>
+      <div class="ph"><span class="idx">03</span>실시간 지도</div>
+      <div class="hud-state" id="hudState">대기 중</div>
+      <div class="hud-sub" id="hudSub">장소와 환자 상황을 기다리고 있어요</div>
     </div>
-    <div class="hud hud-tr" id="hudCoord"><span>ORIGIN</span><b>--.----° N</b><b>---.----° E</b></div>
-    <div class="hud hud-bl">
-      <span class="lg"><i style="background:#f472b6;box-shadow:0 0 8px #f472b6"></i>출발지</span>
-      <span class="lg"><i style="background:#22d3ee;box-shadow:0 0 8px #22d3ee"></i>추천</span>
-      <span class="lg"><i style="background:#a78bfa"></i>대안</span>
-      <span class="lg"><i style="background:#fbbf24"></i>보류</span>
-      <span class="lg"><i style="background:#fb7185"></i>제외</span>
+    <div class="hud hud-tr" id="hudCoord"></div>
+    <div class="hud hud-bl legend">
+      <span class="lg"><i class="o"></i>출발지</span><span class="lg"><i class="r"></i>추천</span><span class="lg"><i class="a"></i>대안</span><span class="lg"><i class="h"></i>보류</span><span class="lg"><i class="x"></i>제외</span>
     </div>
-    <div class="hud hud-br" id="hudMeta">NODES 00 · GLOBAL VIEW</div>
+    <div class="hud hud-br mono" id="hudMeta"></div>
     <div class="tip" id="tip" hidden></div>
-    <div class="lock" id="lock" hidden><span>ROUTE LOCKED</span><b id="lockName"></b><em id="lockEta"></em></div>
   </section>
 
-  <aside class="panel rank" id="rank" aria-label="응급실 순위">
-    <div class="ph"><b>04</b>Route Ranking<span class="grow"></span><span class="ph-r" id="rankTime"></span></div>
+  <aside class="panel rank" style="--i:2" id="rank" aria-label="추천 순위">
+    <div class="ph"><span class="idx">04</span>추천 순위<span class="grow"></span><span class="ph-r mono" id="rankTime"></span></div>
     <div class="req" id="req" hidden></div>
     <div class="notice partial" id="partial" hidden></div>
     <div class="need" id="need" hidden></div>
     <div class="top3" id="top3"></div>
-    <div class="ph"><b>04-B</b>ETA Comparison<span class="grow"></span></div>
+    <div class="sub-h">도착 시간 비교</div>
     <div class="insight" id="insight" hidden></div>
     <ol class="bars" id="bars"></ol>
   </aside>
 
-  <footer class="foot">
-    <span class="foot-tag"><i></i>LIVE</span>
-    <div class="tick"><div class="tick-track" id="tick"></div></div>
-    <span class="disc">연구용 시뮬레이션 · 실제 이송 판단에 쓰지 않습니다</span>
-    <span class="ver">v1.0</span>
+  <footer class="foot" style="--i:3">
+    <span>연구용 시뮬레이션 · 실제 이송 판단에 쓰지 않습니다</span>
+    <span class="grow"></span>
+    <span class="mono">국립중앙의료원 · 카카오 · v2.0</span>
   </footer>
 </div>
 <div id="live" class="sr" aria-live="polite"></div>

@@ -3,22 +3,17 @@
 // 질문 → 분석 연출(지도·단계·순위판 뼈대) → 결과(지도·순위판·브리핑), 샘플 시연, 연결 안내
 
 const EXAMPLES = ["보라매공원, 50대 다리골절 노인", "강남역, 60대 남성 갑작스러운 가슴 통증", "잠실 롯데월드, 7살 아이 열성 경련", "광화문광장, 70대 여성 한쪽 팔다리 마비"];
-const STAGE_HUD = [null, ["LOCATING", "카카오 장소 검색으로 좌표를 찾는 중"], ["SCANNING ER", "주변 응급실 후보 10곳을 찾는 중"], ["LIVE BEDS", "가용병상·중증질환 수용·제한 메시지 확인 중"], ["ROUTING", "실시간 교통으로 도로 이동 시간 계산 중"], ["AI DECISION", "에이전트가 순위를 판단하는 중"]];
+const STAGE_HUD = [null, ["위치 확인", "카카오 장소 검색으로 좌표를 찾고 있어요"], ["응급실 후보 탐색", "주변 응급실 10곳을 찾고 있어요"], ["실시간 병상 확인", "가용 병상·중증질환 수용·제한 메시지를 확인하고 있어요"], ["도로 이동 시간 계산", "실시간 교통으로 이동 시간을 계산하고 있어요"], ["AI 판단", "에이전트가 순위를 판단하고 있어요"]];
 const GREET = /^Hello! I'm (.+?)\. How can I help you today\?$/;
 const App = { store: null, connected: false, heard: false, turn: null, data: null, demo: false, timer: 0, pt: 0, quiet: 0 };
 const q = $("#q"), sendBtn = $("#send"), chipsEl = $("#chips"), noticeEl = $("#notice");
 
-const Boot = (() => {
-  const el = $("#boot"), log = $("#bootLog"); let done = false;
-  const line = (txt, cls) => log.append(h("div", cls || null, txt));
-  function close(delay) { if (done) return; done = true; setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 700); }, delay || 0); }
-  if (REDUCED || /[?&]demo/.test(location.search)) { el.remove(); done = true; }
-  else { line("> GOLDEN TIME ROUTER // HOLO HUD"); setTimeout(() => line("> 응급의료 데이터 링크 준비"), 250); setTimeout(() => line("> 에이전트 토큰 요청 · agent-seal broker"), 500); setTimeout(() => close(), 3400); el.addEventListener("click", () => close()); }
-  return { ok: () => { if (done) return; line("> Direct Line 연결 완료 · 대기", "ok"); close(650); }, fail: m => { if (done) return; line("> 연결 실패 · " + m, "bad"); line("> 샘플 시연으로 화면을 볼 수 있어요", "bad"); close(1400); } };
-})();
+// 처음 화면: 패널이 차례로 떠오르고 지구본의 점이 모여듭니다.
+requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("is-loading")));
+Holo.intro();
 
 function setHud(state, sub) { $("#hudState").textContent = state; if (sub != null) $("#hudSub").textContent = sub; }
-function setCoord(o) { const c = $("#hudCoord"), p = o && o.est ? "≈ " : ""; c.replaceChildren(h("span", null, o && o.est ? "ORIGIN · 추정" : "ORIGIN"), h("b", null, o && o.lat != null ? p + o.lat.toFixed(4) + "° N" : "--.----° N"), h("b", null, o && o.lng != null ? p + o.lng.toFixed(4) + "° E" : "---.----° E")); }
+function setCoord(o) { const c = $("#hudCoord"); if (!o || o.lat == null || o.lng == null) { c.replaceChildren(); return; } c.replaceChildren(h("span", null, o.est ? "출발지 · 추정" : "출발지"), h("b", null, (o.est ? "≈ " : "") + o.lat.toFixed(4) + "°N  " + o.lng.toFixed(4) + "°E")); }
 function setMeta(t) { $("#hudMeta").textContent = t; }
 function setLink(state, text) { document.body.classList.toggle("is-connected", state === "on"); document.body.classList.toggle("is-error", state === "err"); $("#linkText").textContent = text; }
 function busy() { return !!(App.turn && !App.turn.paused); }
@@ -73,8 +68,8 @@ function submit(text) {
 function beginTurn(text, demo) {
   App.turn = { text, demo, paused: false }; App.data = null;
   document.body.classList.add("is-working"); document.body.classList.remove("is-result");
-  FX.boost(true); Holo.locate(); Pipe.start(demo); Rank.scanning(); Rank.request(text); Ticker.scan(text); setCoord(null); $("#partial").hidden = true; clearTimeout(App.pt);
-  setMeta("NODES 00 · " + (demo ? "SAMPLE" : "LIVE") + " SCAN");
+  Holo.locate(); Pipe.start(demo); Rank.scanning(); Rank.request(text); setCoord(null); $("#partial").hidden = true; clearTimeout(App.pt);
+  setMeta(demo ? "샘플 시연 · 기록 재생" : "실시간 수집 중");
   clearTimeout(App.timer); if (!demo) App.timer = setTimeout(() => endTurn(), 180000);
   refresh(); if (MOBILE()) scrollToEl($("#holoPanel"));
   say("분석을 시작했어요. " + text);
@@ -82,24 +77,24 @@ function beginTurn(text, demo) {
 function pauseTurn() {
   const t = App.turn; if (!t || t.paused) return;
   t.paused = true; clearTimeout(App.timer);
-  document.body.classList.remove("is-working"); FX.boost(false);
+  document.body.classList.remove("is-working");
   Pipe.finish(false, "에이전트가 먼저 답했어요. 질문이 있다면 브리핑을 보고 답해 주세요.");
-  Holo.reset(); Rank.empty(); Ticker.idle(); setMeta("NODES 00 · STANDBY");
-  setHud("AWAITING INPUT", "에이전트의 답을 아래 브리핑에서 확인하세요"); refresh();
+  Holo.reset(); Rank.empty(); setMeta("글로벌 뷰");
+  setHud("답변 확인", "에이전트의 답을 브리핑에서 확인하세요"); refresh();
   setTimeout(scrollBriefToLatest, 300);
   say("에이전트가 답했어요. 브리핑을 확인하세요.");
 }
 function resumeTurn() {
   const t = App.turn; if (!t || !t.paused) return;
-  t.paused = false; document.body.classList.add("is-working"); FX.boost(true);
-  Holo.locate(); Pipe.start(t.demo); Rank.scanning(); Rank.request(t.text); Ticker.scan(t.text); refresh();
+  t.paused = false; document.body.classList.add("is-working");
+  Holo.locate(); Pipe.start(t.demo); Rank.scanning(); Rank.request(t.text); refresh();
   clearTimeout(App.timer); App.timer = setTimeout(() => endTurn(), 180000);
 }
 function endTurn() {
   if (!App.turn) return; App.turn = null; clearTimeout(App.timer);
-  document.body.classList.remove("is-working"); FX.boost(false);
-  Pipe.finish(false, "응답이 없어요. 새 대화를 눌러 다시 시도해 주세요."); Holo.reset(); Rank.empty(); Ticker.idle();
-  setHud("NO RESPONSE", "응답이 너무 늦어요. 새 대화로 다시 시도해 주세요."); refresh();
+  document.body.classList.remove("is-working");
+  Pipe.finish(false, "응답이 없어요. 새 대화를 눌러 다시 시도해 주세요."); Holo.reset(); Rank.empty(); setMeta("글로벌 뷰");
+  setHud("응답 없음", "응답이 너무 늦어요. 새 대화로 다시 시도해 주세요."); refresh();
 }
 // 결과가 나오면 브리핑을 그 답의 첫 줄로 옮겨, 순위판과 같은 답을 보게 합니다.
 function scrollBriefToLatest() {
@@ -110,18 +105,14 @@ function scrollBriefToLatest() {
 }
 function showResult(d) {
   const t = App.turn; clearTimeout(App.timer); clearTimeout(App.pt); App.turn = null; App.data = d;
-  document.body.classList.remove("is-working"); document.body.classList.add("is-result"); FX.boost(false);
+  document.body.classList.remove("is-working"); document.body.classList.add("is-result");
   const total = Holo.setData(d);
-  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + DEMO.at : null); Rank.render(d, total); Ticker.result(d); setCoord(d.origin);
+  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + DEMO.at : null); Rank.render(d, total); setCoord(d.origin);
   const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), best = recs[0];
-  setMeta("NODES " + pad2(d.hs.filter(x => x.lat != null && x.lng != null).length) + " · RANKED " + recs.length + (t && t.demo ? " · SAMPLE" : " · LIVE"));
-  setHud("ROUTE LOCKED", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
+  setMeta("후보 " + d.hs.filter(x => x.lat != null && x.lng != null).length + " · 추천 " + recs.length + (t && t.demo ? " · 샘플" : " · 실시간"));
+  setHud(best ? "추천 경로" : "추천 없음", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
   const pn = $("#partial"); pn.hidden = !d.partial;
   if (d.partial) pn.replaceChildren(h("b", null, "요약 모드 · "), document.createTextNode("에이전트 답에 지도 데이터(JSON)가 없어 상위 3곳과 보류·제외만 보여요" + (d.origin.est ? "(출발지는 세 병원의 직선거리로 추정)" : "") + ". 지침에 '웹앱용 데이터' 규칙을 넣고 게시하면 후보 10곳이 모두 지도에 나타나요."));
-  if (best && !REDUCED) setTimeout(() => {
-    const lock = $("#lock"); $("#lockName").textContent = best.name; $("#lockEta").textContent = (best.min != null ? "ETA " + best.min + " MIN" : "") + (best.beds != null ? " · BEDS " + best.beds : "");
-    lock.hidden = false; lock.style.animation = "none"; void lock.offsetWidth; lock.style.animation = ""; setTimeout(() => { lock.hidden = true; }, 2900);
-  }, total);
   if (t && !t.demo) [400, 1100, 2200].forEach(ms => setTimeout(scrollBriefToLatest, ms));
   refresh(); say(best ? "추천 결과: 1순위 " + best.name + (best.min != null ? ", 예상 " + best.min + "분" : "") : "조건에 맞는 병원을 찾지 못했어요");
 }
@@ -155,20 +146,20 @@ function runDemo() {
   setTimeout(() => {
     if (!App.turn || !App.turn.demo) return;
     const r = readAnswer(DEMO.answer);
-    box.replaceChildren(ub(), mdBlock(r.text), h("p", "demo-tag", "SAMPLE · " + DEMO.at + " · 에이전트에 연결하지 않고 기록한 답을 재생했어요"));
+    box.replaceChildren(ub(), mdBlock(r.text), h("p", "demo-tag", "샘플 · " + DEMO.at + " · 에이전트에 연결하지 않고 기록한 답을 재생했어요"));
     box.scrollTop = 0; showResult(r.data);
   }, REDUCED ? 600 : 7600);
 }
 
 App.onStage = s => { Holo.setStage(s); const x = STAGE_HUD[s]; if (x && busy()) setHud(x[0], x[1] + (App.turn.demo ? " · 샘플" : "")); };
 App.onConnected = () => {
-  if (App.connected) return; App.connected = true; setLink("on", "LINK · ONLINE"); Boot.ok();
+  if (App.connected) return; App.connected = true; setLink("on", "에이전트 연결됨");
   if (!App.demo) noticeEl.hidden = true; refresh(); say("에이전트와 연결됐어요");
   clearTimeout(App.quiet); App.quiet = setTimeout(() => { if (!App.heard && !App.demo) showNotice("silent"); }, 20000);
 };
 App.onConnectError = e => {
   App.connected = false; const kind = errorKind(e), m = (e && e.message) || String(e || "unknown");
-  setLink("err", "LINK · OFFLINE"); Boot.fail(NOTICE[kind][0]); showNotice(kind, m); refresh();
+  setLink("err", "연결 안 됨"); showNotice(kind, m); refresh();
 };
 App.onBot = (a, r) => {
   if (a.type !== "event" && !App.heard) { App.heard = true; clearTimeout(App.quiet); if (noticeEl.dataset.kind === "silent") noticeEl.hidden = true; }
@@ -201,7 +192,7 @@ function makeStore() {
     return next(action);
   });
 }
-const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "#dfe6ff", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "rgba(34,211,238,.12)", bubbleFromUserBorderColor: "rgba(34,211,238,.38)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 12, bubbleFromUserTextColor: "#ecfeff", subtle: "#8d96bd", accent: "#22d3ee", timestampColor: "#5d6594", paddingRegular: 10, paddingWide: 12 };
+const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "#dfe2e7", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "rgba(255,255,255,.06)", bubbleFromUserBorderColor: "rgba(255,255,255,.12)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 14, bubbleFromUserTextColor: "#eef0f3", subtle: "#8a8f99", accent: "#ff7b6b", timestampColor: "#5d626c", paddingRegular: 10, paddingWide: 12 };
 
 Pipe.onStage(App.onStage);
 Holo.onPick(i => Rank.select(i, true));
@@ -214,5 +205,5 @@ $("#demoBtn").addEventListener("click", runDemo);
 $("#newBtn").addEventListener("click", () => location.reload());
 document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); } });
 setInterval(() => { const d = new Date(); $("#clock").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) + (d.getTimezoneOffset() === -540 ? " KST" : ""); }, 1000);
-renderChips(); Rank.empty(); Ticker.idle(); setCoord(null); refresh();
+renderChips(); Rank.empty(); setCoord(null); setMeta("글로벌 뷰"); refresh();
 if (/[?&]demo/.test(location.search)) setTimeout(runDemo, 700);
