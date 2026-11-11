@@ -5,15 +5,23 @@
 const EXAMPLES = ["보라매공원, 50대 다리골절 노인", "강남역, 60대 남성 갑작스러운 가슴 통증", "잠실 롯데월드, 7살 아이 열성 경련", "광화문광장, 70대 여성 한쪽 팔다리 마비"];
 const STAGE_HUD = [null, ["위치 확인", "카카오 장소 검색으로 좌표를 찾고 있어요"], ["응급실 후보 탐색", "주변 응급실 10곳을 찾고 있어요"], ["실시간 병상 확인", "가용 병상·중증질환 수용·제한 메시지를 확인하고 있어요"], ["도로 이동 시간 계산", "실시간 교통으로 이동 시간을 계산하고 있어요"], ["AI 판단", "에이전트가 순위를 판단하고 있어요"]];
 const GREET = /^Hello! I'm (.+?)\. How can I help you today\?$/;
-const App = { store: null, connected: false, heard: false, turn: null, data: null, demo: false, timer: 0, pt: 0, quiet: 0 };
+const App = { store: null, connected: false, heard: false, turn: null, data: null, demo: false, timer: 0, pt: 0, quiet: 0, di: 0 };
 const q = $("#q"), sendBtn = $("#send"), chipsEl = $("#chips"), noticeEl = $("#notice");
+const IDLE_META = "전국 응급실 " + Geo.ER.length + "곳 · 국립중앙의료원";
+// 결과 박자마다 지도 위 상태 문구: 에이전트의 판단 순서(필요한 치료 → 병상·수용 제한 → 도착 시간 → 순위)
+const BEAT_HUD = {
+  1: i => ["치료 가능 여부", i.out ? "필요한 치료를 할 수 없는 " + i.out + "곳을 뺐어요" : "후보 모두 필요한 치료를 할 수 있어요"],
+  2: i => ["병상·수용 제한", i.chk ? "병상이 없거나 수용 제한이 있는 " + i.chk + "곳은 전화 확인이 필요해요" : "병상과 수용 제한에 걸린 곳이 없어요"],
+  3: i => ["도착 시간", i.racers ? "남은 " + i.racers + "곳으로 동시에 출발 · 실제 소요 시간 1분 = " + (+(i.rate / 1000).toFixed(2)) + "초" : "실제 소요 시간으로 비교해요"],
+  4: i => { const b = i.best; return [b ? "추천 경로" : "추천 없음", b ? "1순위 " + b.name + (b.min != null ? " · 예상 " + b.min + "분" : "") + (b.chk ? " · 전화 확인 필요" : "") : "조건에 맞는 병원이 없어요"]; }
+};
 
 // 처음 화면: 패널이 차례로 떠오르고 지구본의 점이 모여듭니다.
 requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove("is-loading")));
 Holo.intro();
 
 function setHud(state, sub) { $("#hudState").textContent = state; if (sub != null) $("#hudSub").textContent = sub; }
-function setCoord(o) { const c = $("#hudCoord"); if (!o || o.lat == null || o.lng == null) { c.replaceChildren(); return; } c.replaceChildren(h("span", null, o.est ? "출발지 · 추정" : "출발지"), h("b", null, (o.est ? "≈ " : "") + o.lat.toFixed(4) + "°N  " + o.lng.toFixed(4) + "°E")); }
+function setCoord(o) { const c = $("#hudCoord"); if (!o || o.lat == null || o.lng == null) { c.replaceChildren(); return; } c.replaceChildren(h("span", null, o.web ? "출발지 · 지도 검색" : o.est ? "출발지 · 추정" : "출발지"), h("b", null, (o.est ? "≈ " : "") + o.lat.toFixed(4) + "°N  " + o.lng.toFixed(4) + "°E")); }
 function setMeta(t) { $("#hudMeta").textContent = t; }
 function setLink(state, text) { document.body.classList.toggle("is-connected", state === "on"); document.body.classList.toggle("is-error", state === "err"); $("#linkText").textContent = text; }
 function busy() { return !!(App.turn && !App.turn.paused); }
@@ -65,21 +73,32 @@ function submit(text) {
   App.store.dispatch({ type: "WEB_CHAT/SEND_MESSAGE", payload: { text } });
   q.value = ""; autosize(); renderSuggested([]); beginTurn(text, false);
 }
-function beginTurn(text, demo) {
-  App.turn = { text, demo, paused: false }; App.data = null;
+function beginTurn(text, demo, sample) {
+  const t = App.turn = { text, demo, paused: false, at: sample ? sample.at : null }; App.data = null;
   document.body.classList.add("is-working"); document.body.classList.remove("is-result");
   Holo.locate(); Pipe.start(demo); Rank.scanning(); Rank.request(text); setCoord(null); $("#partial").hidden = true; clearTimeout(App.pt);
   setMeta(demo ? "샘플 시연 · 기록 재생" : "실시간 수집 중");
   clearTimeout(App.timer); if (!demo) App.timer = setTimeout(() => endTurn(), 180000);
+  findOrigin(t, sample);
   refresh(); if (MOBILE()) scrollToEl($("#holoPanel"));
   say("분석을 시작했어요. " + text);
+}
+// 기다리는 동안 지도를 실제 위치로: 질문의 장소 이름만 OpenStreetMap에서 찾고, 전국 응급실 목록에서 가까운 10곳을 고릅니다(샘플은 기록된 출발지).
+function findOrigin(t, sample) {
+  const put = o => {
+    if (!o || App.turn !== t || t.paused) return;
+    const c = Geo.nearest(o.lat, o.lng, 10), sido = c[0] && c[0].sido;
+    Holo.origin(o, c, { sido, count: sido ? Geo.inSido(sido) : 0 }); setCoord({ lat: o.lat, lng: o.lng, web: true });
+  };
+  if (sample) { const d = readAnswer(sample.answer).data, o = d && d.origin; if (o && o.lat != null) setTimeout(() => put({ lat: o.lat, lng: o.lng, name: Geo.place(t.text) || o.name }), REDUCED ? 0 : 1600); return; }
+  Geo.find(t.text).then(put, () => { });
 }
 function pauseTurn() {
   const t = App.turn; if (!t || t.paused) return;
   t.paused = true; clearTimeout(App.timer);
   document.body.classList.remove("is-working");
   Pipe.finish(false, "에이전트가 먼저 답했어요. 질문이 있다면 브리핑을 보고 답해 주세요.");
-  Holo.reset(); Rank.empty(); setMeta("글로벌 뷰");
+  Holo.reset(); Rank.empty(); setMeta(IDLE_META); setCoord(null);
   setHud("답변 확인", "에이전트의 답을 브리핑에서 확인하세요"); refresh();
   setTimeout(scrollBriefToLatest, 300);
   say("에이전트가 답했어요. 브리핑을 확인하세요.");
@@ -89,11 +108,12 @@ function resumeTurn() {
   t.paused = false; document.body.classList.add("is-working");
   Holo.locate(); Pipe.start(t.demo); Rank.scanning(); Rank.request(t.text); refresh();
   clearTimeout(App.timer); App.timer = setTimeout(() => endTurn(), 180000);
+  findOrigin(t);
 }
 function endTurn() {
   if (!App.turn) return; App.turn = null; clearTimeout(App.timer);
   document.body.classList.remove("is-working");
-  Pipe.finish(false, "응답이 없어요. 새 대화를 눌러 다시 시도해 주세요."); Holo.reset(); Rank.empty(); setMeta("글로벌 뷰");
+  Pipe.finish(false, "응답이 없어요. 새 대화를 눌러 다시 시도해 주세요."); Holo.reset(); Rank.empty(); setMeta(IDLE_META); setCoord(null);
   setHud("응답 없음", "응답이 너무 늦어요. 새 대화로 다시 시도해 주세요."); refresh();
 }
 // 결과가 나오면 브리핑을 그 답의 첫 줄로 옮겨, 순위판과 같은 답을 보게 합니다.
@@ -106,11 +126,11 @@ function scrollBriefToLatest() {
 function showResult(d) {
   const t = App.turn; clearTimeout(App.timer); clearTimeout(App.pt); App.turn = null; App.data = d;
   document.body.classList.remove("is-working"); document.body.classList.add("is-result");
-  const total = Holo.setData(d);
-  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + DEMO.at : null); Rank.render(d, total); setCoord(d.origin);
+  setHud("AI 판단 결과", "에이전트의 판단 순서대로 지도에 보여 드려요");
+  Holo.setData(d);
+  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + t.at : null); Rank.render(d, 0); if (d.origin.lat != null) setCoord(d.origin);
   const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), best = recs[0];
   setMeta("후보 " + d.hs.filter(x => x.lat != null && x.lng != null).length + " · 추천 " + recs.length + (t && t.demo ? " · 샘플" : " · 실시간"));
-  setHud(best ? "추천 경로" : "추천 없음", best ? "1순위 " + best.name + (best.min != null ? " · 예상 " + best.min + "분" : "") : "조건에 맞는 병원이 없어요");
   const pn = $("#partial"); pn.hidden = !d.partial;
   if (d.partial) pn.replaceChildren(h("b", null, "요약 모드 · "), document.createTextNode("에이전트 답에 지도 데이터(JSON)가 없어 상위 3곳과 보류·제외만 보여요" + (d.origin.est ? "(출발지는 세 병원의 직선거리로 추정)" : "") + ". 지침에 '웹앱용 데이터' 규칙을 넣고 게시하면 후보 10곳이 모두 지도에 나타나요."));
   if (t && !t.demo) [400, 1100, 2200].forEach(ms => setTimeout(scrollBriefToLatest, ms));
@@ -137,16 +157,18 @@ function mdBlock(md) {
   });
   return box;
 }
-function runDemo() {
+// 샘플 시연: 실제 에이전트 답 기록을 차례로 재생합니다(?demo=1~4로 고를 수 있음).
+function runDemo(n) {
   if (busy()) return;
+  const k = Number.isInteger(n) ? clamp(n, 0, DEMOS.length - 1) : App.di % DEMOS.length, D = DEMOS[k]; App.di = k + 1;
   App.demo = true; showChat(true); noticeEl.hidden = true;
-  const box = $("#demoBrief"), ub = () => h("div", "ubub", DEMO.text);
+  const box = $("#demoBrief"), ub = () => h("div", "ubub", D.text);
   box.replaceChildren(ub(), h("p", "demo-wait", "에이전트가 워크플로로 실시간 데이터를 모으고 있어요…"));
-  beginTurn(DEMO.text, true);
+  beginTurn(D.text, true, D);
   setTimeout(() => {
     if (!App.turn || !App.turn.demo) return;
-    const r = readAnswer(DEMO.answer);
-    box.replaceChildren(ub(), mdBlock(r.text), h("p", "demo-tag", "샘플 · " + DEMO.at + " · 에이전트에 연결하지 않고 기록한 답을 재생했어요"));
+    const r = readAnswer(D.answer);
+    box.replaceChildren(ub(), mdBlock(r.text), h("p", "demo-tag", "샘플 " + (k + 1) + "/" + DEMOS.length + " · " + D.at + " · 에이전트에 연결하지 않고 기록한 답을 재생했어요"));
     box.scrollTop = 0; showResult(r.data);
   }, REDUCED ? 600 : 7600);
 }
@@ -195,6 +217,7 @@ function makeStore() {
 const STYLE = { hideSendBox: true, hideUploadButton: true, rootHeight: "100%", backgroundColor: "transparent", primaryFont: FONT, monospaceFont: MONO, bubbleBackground: "transparent", bubbleBorderWidth: 0, bubbleTextColor: "#dfe2e7", bubbleMaxWidth: 680, bubbleMinWidth: 0, bubbleNubSize: 0, bubbleFromUserNubSize: 0, bubbleFromUserBackground: "rgba(255,255,255,.06)", bubbleFromUserBorderColor: "rgba(255,255,255,.12)", bubbleFromUserBorderWidth: 1, bubbleFromUserBorderRadius: 14, bubbleFromUserTextColor: "#eef0f3", subtle: "#8a8f99", accent: "#ff7b6b", timestampColor: "#5d626c", paddingRegular: 10, paddingWide: 12 };
 
 Pipe.onStage(App.onStage);
+Holo.onBeat((k, info) => { if (App.turn) return; const x = BEAT_HUD[k](info); setHud(x[0], x[1]); });
 Holo.onPick(i => Rank.select(i, true));
 Rank.onPick(i => { Holo.select(i); Rank.select(i, false); });
 Rank.onHover(i => Holo.hover(i));
@@ -205,5 +228,6 @@ $("#demoBtn").addEventListener("click", runDemo);
 $("#newBtn").addEventListener("click", () => location.reload());
 document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q && !/input|textarea/i.test(document.activeElement.tagName)) { e.preventDefault(); q.focus(); } });
 setInterval(() => { const d = new Date(); $("#clock").textContent = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()) + (d.getTimezoneOffset() === -540 ? " KST" : ""); }, 1000);
-renderChips(); Rank.empty(); setCoord(null); setMeta("글로벌 뷰"); refresh();
-if (/[?&]demo/.test(location.search)) setTimeout(runDemo, 700);
+renderChips(); Rank.empty(); setCoord(null); setMeta(IDLE_META); refresh();
+const DM = location.search.match(/[?&]demo(?:=(\d+))?/);
+if (DM) setTimeout(() => runDemo(DM[1] ? +DM[1] - 1 : 0), 700);

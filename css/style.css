@@ -142,9 +142,10 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 .hud-sub { max-width: min(440px, 58vw); margin: 6px 4px 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
 .hud-tr { top: 18px; right: 4px; text-align: right; font: 500 11px/1.75 var(--mono); color: var(--dim); }
 .hud-tr b { display: block; font-weight: 500; color: var(--ink-2); }
-.hud-bl { left: 4px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; max-width: 70%; }
+.hud-bl { left: 4px; bottom: 14px; display: flex; flex-wrap: wrap; gap: 6px 16px; max-width: min(70%, calc(100% - 196px)); }
 .lg { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
 .lg i { width: 7px; height: 7px; border-radius: 50%; }
+.lg .e { background: #f6f1e9; box-shadow: 0 0 6px rgba(255, 228, 214, .55); }
 .lg .o { background: #fff; box-shadow: 0 0 0 2px rgba(255, 255, 255, .18); }
 .lg .r { background: var(--coral); }
 .lg .a { background: var(--silver); opacity: .85; }
@@ -190,6 +191,9 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 .m small { margin-left: 2px; font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .m em { display: block; margin-top: 7px; font-size: 11px; font-style: normal; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card.r1 .m.eta b { color: var(--coral-2); }
+.m.warn b { color: #f0c98a; }
+.chkp { margin: 10px 0 0; padding: 7px 10px; border-radius: 10px; background: rgba(233, 179, 95, .07); border: 1px solid rgba(233, 179, 95, .2); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.chkp b { margin-right: 4px; font-weight: 600; color: #f0c98a; }
 .card .note { margin: 12px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--ink-2); }
 .act { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .abtn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .03); color: var(--ink); font-size: 12px; font-weight: 500; text-decoration: none; cursor: pointer; white-space: nowrap; transition: background .3s var(--ease), border-color .3s var(--ease); }

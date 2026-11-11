@@ -70,9 +70,11 @@ const Rank = (() => {
     recs.forEach((x, k) => {
       const c = h("article", "card r" + x.rank); c.style.setProperty("--d", D + k * 140 + "ms"); c.dataset.i = x.i; c.tabIndex = 0;
       const head = h("div", "card-head"); head.append(h("span", "no", pad2(x.rank)), h("h3", null, x.name));
-      const mt = h("div", "metrics");
-      mt.append(metric("eta", "예상 소요", x.min, "분", "실시간 교통"), metric("", "가용 병상", x.beds, "", x.time ? x.time + " 기준" : ""), metric("", x.road != null ? "도로 거리" : "직선 거리", x.road ?? x.km, "km", x.road != null && x.km != null ? "직선 " + x.km + "km" : ""));
-      c.append(head, mt);
+      const mt = h("div", "metrics"), bedsM = metric(x.beds != null && x.beds <= 0 ? "warn" : "", "가용 병상", x.beds, "", x.time ? x.time + " 기준" : "");
+      mt.append(metric("eta", "예상 소요", x.min, "분", "실시간 교통"), bedsM, metric("", x.road != null ? "도로 거리" : "직선 거리", x.road ?? x.km, "km", x.road != null && x.km != null ? "직선 " + x.km + "km" : ""));
+      c.append(head);
+      if (x.chk) { const p = h("p", "chkp"); p.append(h("b", null, "확인 필요 · " + x.why), document.createTextNode(" 출발 전 전화로 수용을 확인하세요")); c.append(p); }
+      c.append(mt);
       if (x.note) c.append(h("p", "note", x.note));
       const act = h("div", "act");
       if (x.tel) { const a = h("a", "abtn"); a.href = "tel:" + x.tel.replace(/[^0-9+]/g, ""); a.innerHTML = ICON.tel; a.append(document.createTextNode(x.tel)); act.append(a); }
@@ -81,10 +83,18 @@ const Rank = (() => {
       top3.append(c); bind(c, x.i);
     });
     countUp(top3, D + 250);
-    const best = recs[0], near = d.hs.filter(x => x.km != null && x.st !== "out").sort((a, b) => a.km - b.km)[0];
-    if (best && near && near !== best && near.min != null && best.min != null) {
-      const diff = near.min - best.min, jo = hasJong(near.short) ? "은" : "는";
-      insight.replaceChildren(h("b", null, "직선으로 가장 가까운 곳이 가장 빠르지는 않아요"), document.createTextNode(near.short + jo + " 직선 " + near.km + "km로 가장 가깝지만 도로로 " + (near.road != null ? near.road + "km · " : "") + near.min + "분 걸려요. " + (diff > 0 ? "1순위 " + best.short + "보다 " + diff + "분 늦습니다." : "도착 시간은 비슷하지만 병상·수용 조건에서 순위가 갈렸어요.")));
+    // 인사이트: 가장 빨리 도착하는 곳이 1순위가 아니면 그 이유를, 아니면 직선 최단과 실제 소요의 차이를 알려 줍니다.
+    const best = recs[0], tsec = x => x.sec != null ? x.sec : x.min != null ? x.min * 60 : null;
+    const fast = d.hs.filter(x => x.st !== "out" && tsec(x) != null).sort((a, b) => tsec(a) - tsec(b))[0];
+    const near = d.hs.filter(x => x.km != null && x.st !== "out").sort((a, b) => a.km - b.km)[0];
+    const eun = s => hasJong(s) ? "은" : "는", ida = s => hasJong(s) ? "이에요" : "예요";
+    if (best && fast && fast !== best && best.min != null) {
+      const why = fast.chk ? fast.why + " 때문에 뒤로 밀렸어요." : "병상·수용 조건을 함께 보고 순위를 정했어요.";
+      insight.replaceChildren(h("b", null, "가장 빨리 도착하는 곳이 1순위는 아니에요"), document.createTextNode("가장 빠른 " + fast.short + "(" + fast.min + "분)" + eun(fast.short) + " " + why + " 1순위는 " + best.short + "(" + best.min + "분)" + ida(best.short) + "."));
+      insight.hidden = false;
+    } else if (best && near && near !== best && near.min != null && best.min != null) {
+      const diff = near.min - best.min;
+      insight.replaceChildren(h("b", null, "직선으로 가장 가까운 곳이 가장 빠르지는 않아요"), document.createTextNode(near.short + eun(near.short) + " 직선 " + near.km + "km로 가장 가깝지만 도로로 " + (near.road != null ? near.road + "km · " : "") + near.min + "분 걸려요. " + (diff > 0 ? "1순위 " + best.short + "보다 " + diff + "분 늦습니다." : "도착 시간은 비슷하지만 병상·수용 조건에서 순위가 갈렸어요.")));
       insight.hidden = false;
     } else insight.hidden = true;
     bars.replaceChildren();
@@ -93,9 +103,9 @@ const Rank = (() => {
     order.forEach((x, k) => {
       const li = h("li", "bar st-" + x.st); li.dataset.i = x.i; li.tabIndex = 0; li.style.setProperty("--d", D + 300 + k * 60 + "ms");
       const mark = x.rank ? h("span", "rk", String(x.rank)) : h("span", "dot");
-      const nm = h("span", "nm", x.short); if (near && x === near && x !== best) nm.append(h("small", null, "직선 최단"));
+      const nm = h("span", "nm", x.short); if (near && x === near && x !== best) nm.append(h("small", null, "직선 최단")); else if (x.chk && x.st !== "out") nm.append(h("small", null, x.why));
       const tr = h("span", "track"), bi = h("i"); bi.style.setProperty("--w", x.min != null ? Math.max(4, x.min / maxMin * 100) + "%" : "0%"); tr.append(bi);
-      const sub = [ST_TXT[x.st], x.beds != null ? "병상 " + x.beds : null, x.km != null ? "직선 " + x.km + "km" : null, x.note || null].filter(Boolean).join(" · ");
+      const sub = [ST_TXT[x.st] + (x.chk && x.st !== "hold" ? " · 확인 필요" : ""), x.beds != null ? "병상 " + x.beds : null, x.km != null ? "직선 " + x.km + "km" : null, x.note || null].filter(Boolean).join(" · ");
       li.append(mark, nm, tr, h("span", "v", x.min != null ? x.min + "분" : "–"), h("span", "sub", sub)); li.title = x.name + " — " + sub;
       bars.append(li); bind(li, x.i);
     });

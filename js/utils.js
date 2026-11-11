@@ -22,7 +22,8 @@ function shortName(n) {
   let s = String(n || "").trim();
   s = s.replace(/^(의료법인|재단법인|학교법인|사회복지법인|사단법인)\s*/, "");
   let m = s.match(/^.*?의료재단\s*(.+)$/); if (m && m[1].length > 2) s = m[1];
-  s = s.replace(/대학교의과대학부속\s*/, "대 ").replace(/대학교\s+/, "대 ");
+  m = s.match(/^[가-힣]{2,12}?(?:학원|재단|공단)\s*(.+(?:병원|의료원|센터))$/); if (m && m[1].length >= 4) s = m[1];
+  s = s.replace(/대학교(?:의과대학)?(?:부속)?\s*(?=병원$)/, "대").replace(/대학교(?:의과대학)?(?:부속)?\s*/, "대 ");
   m = s.match(/^(?:서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시)립?\s*(.+)$/); if (m && m[1].length >= 4) s = m[1];
   return s.trim() || String(n);
 }
@@ -34,6 +35,7 @@ const ST_ORDER = { rec: 0, alt: 1, hold: 2, out: 3 };
 const COL = { rec: [255, 123, 107], alt: [214, 219, 228], hold: [233, 179, 95], out: [128, 133, 143], origin: [255, 255, 255], ink: [7, 8, 11] };
 
 // 병원 목록을 화면에서 쓰는 모양으로 정리합니다(순위 1~3 다시 매기기, 출발지에서 직선거리 계산).
+// chk(확인 필요): 보류이거나, 추천·대안인데 가용 병상이 0 이하·정보 없음 또는 수용 제한 메시지(기간 표기)가 있는 곳. 에이전트 지침 3·4번처럼 순위를 뒤로 미는 조건입니다.
 function normalize(d) {
   if (!d || !Array.isArray(d.hospitals)) return null;
   const o = d.origin || {};
@@ -41,12 +43,16 @@ function normalize(d) {
     let rank = Math.round(num(x.rank) || 0);
     const st = ST[String(x.status || "").trim()] || (rank > 0 ? "rec" : "alt");
     if (st !== "rec") rank = 0; else if (rank < 1) rank = 99;
-    return { i, name: String(x.name), short: shortName(x.name), rank, st, lat: num(x.lat), lng: num(x.lng), km: num(x.km), road: num(x.road), min: num(x.min), beds: num(x.beds), time: x.time ? String(x.time) : null, tel: x.tel ? String(x.tel) : null, note: x.note ? String(x.note) : "" };
+    return { i, name: String(x.name), short: shortName(x.name), rank, st, lat: num(x.lat), lng: num(x.lng), km: num(x.km), road: num(x.road), min: num(x.min), sec: num(x.sec), beds: num(x.beds), restr: !!x.restr, time: x.time ? String(x.time) : null, tel: x.tel ? String(x.tel) : null, note: x.note ? String(x.note) : "" };
   });
   if (!hs.length) return null;
   const oo = { lat: num(o.lat), lng: num(o.lng) };
   if (oo.lat != null && oo.lng != null) hs.forEach(x => { if (x.km == null && x.lat != null && x.lng != null) x.km = Math.round(distKm(oo, x) * 100) / 100; });
   hs.filter(x => x.st === "rec").sort((a, b) => a.rank - b.rank || (a.min ?? 1e9) - (b.min ?? 1e9)).forEach((x, k) => { if (k < 3) x.rank = k + 1; else { x.rank = 0; x.st = "alt"; } });
+  hs.forEach(x => {
+    x.chk = x.st === "hold" || (x.st !== "out" && (x.beds == null || x.beds <= 0 || x.restr));
+    x.why = !x.chk ? "" : x.restr ? "수용 제한" : x.beds == null ? "병상 정보 없음" : x.beds <= 0 ? "병상 " + x.beds : "확인 필요";
+  });
   return { origin: { name: String(o.name || "기준 위치"), address: o.address ? String(o.address) : "", lat: num(o.lat), lng: num(o.lng), est: !!o.est }, need: d.need ? String(d.need) : "", hs, partial: !!d.partial };
 }
 // 답변 글(1~3순위·보류·제외)에서 읽을 수 있는 만큼 읽습니다.
@@ -60,7 +66,7 @@ function parseMd(text) {
     const t = s.replace(/\*+/g, "").trim(); if (!t) return;
     const k = t.search(/\s[–—-]\s/), names = (k > 0 ? t.slice(0, k) : t).split(/\s*,\s*/), why = k > 0 ? t.slice(k).replace(/^\s*[–—-]\s*/, "") : "";
     const mm = why.match(/예상\s*(\d+)\s*분/), bb = why.match(/병상\s*(-?\d+)/);
-    names.filter(n => n && n.length < 40).forEach(n => d.hospitals.push({ rank: 0, status: st, name: n.trim(), min: mm ? +mm[1] : null, beds: bb ? +bb[1] : null, note: why.split(/[·.(]/)[0].trim().slice(0, 30) }));
+    names.filter(n => n && n.length < 40).forEach(n => d.hospitals.push({ rank: 0, status: st, name: n.trim(), min: mm ? +mm[1] : null, beds: bb ? +bb[1] : null, restr: /\d{4}-\d{2}-\d{2}/.test(why), note: why.split(/[·.(]/)[0].trim().slice(0, 30) }));
   };
   for (const ln of text.split(/\r?\n/)) {
     const t = ln.trim(); let x;
@@ -73,7 +79,7 @@ function parseMd(text) {
         if ((x = s.match(/거리\s*(\d+(?:\.\d+)?)\s*km/))) cur.km = +x[1];
         if ((x = s.match(/가용\s*병상\s*(-?\d+)/))) cur.beds = +x[1];
         if ((x = s.match(/(\d{1,2}:\d{2})\s*기준/))) cur.time = x[1];
-        if ((x = s.match(/^근거\s*[:：]\s*(.+)$/))) cur.note = x[1].slice(0, 40);
+        if ((x = s.match(/^근거\s*[:：]\s*(.+)$/))) { cur.note = x[1].slice(0, 40); cur.restr = /\d{4}-\d{2}-\d{2}/.test(x[1]); }
         if ((x = s.match(/☎\s*([0-9+][0-9\- ]{6,})/))) cur.tel = x[1].trim();
         if ((x = s.match(/map\.kakao\.com\/link\/to\/[^)]*?,\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\)/))) { cur.lat = +x[1]; cur.lng = +x[2]; }
       } else if (sect) entry(s, sect);
@@ -111,7 +117,7 @@ function fromCompact(j) {
   const o = Array.isArray(j.o) ? j.o : [];
   const hospitals = j.h.filter(r => Array.isArray(r) && r[0]).map(r => {
     const v = String(r[1] == null ? "" : r[1]).trim(), m = v.match(/^(?:추천\s*)?([1-3])(?:\s*순위)?$/), sec = num(r[4]);
-    return { name: String(r[0]), status: m ? "추천" : v, rank: m ? +m[1] : 0, lat: num(r[2]), lng: num(r[3]), min: sec != null ? Math.round(sec / 60) : null, beds: num(r[5]) };
+    return { name: String(r[0]), status: m ? "추천" : v, rank: m ? +m[1] : 0, lat: num(r[2]), lng: num(r[3]), sec, min: sec != null ? Math.round(sec / 60) : null, beds: num(r[5]) };
   });
   return { origin: { lat: num(o[0]), lng: num(o[1]) }, need: "", hospitals, partial: false };
 }
@@ -128,7 +134,7 @@ function mergeMd(d, md) {
     const x = d.hospitals.find(y => sameName(y.name, m.name));
     if (!x) { if (m.rank) d.hospitals.push(Object.assign({}, m)); return; }
     if (m.rank) { x.status = "추천"; x.rank = m.rank; } else if (m.status) x.status = m.status;
-    ["min", "km", "beds", "time", "tel", "note"].forEach(k => { if (m[k] != null && m[k] !== "") x[k] = m[k]; });
+    ["min", "km", "beds", "time", "tel", "note", "restr"].forEach(k => { if (m[k] != null && m[k] !== "") x[k] = m[k]; });
     if (x.lat == null && m.lat != null) { x.lat = m.lat; x.lng = m.lng; }
   });
   return d;
