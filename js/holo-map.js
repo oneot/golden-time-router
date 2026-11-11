@@ -13,10 +13,12 @@ const Holo = (() => {
   const PALS = {
     dark: { ink: [255, 255, 255], silver: COL.alt, warm: [246, 241, 233], coral: COL.rec, amber: COL.hold, gray: COL.out, sand: [240, 201, 138], halo: [7, 8, 11], chip: [9, 10, 14], chipA: .86, pulse: [255, 226, 220], dots: [214, 221, 235], hot: [255, 153, 133],
       glInk: [.84, .87, .93], glHot: [1, .6, .52], tb: [.84, .87, .93], tg: [.5, .52, .56], ta: [.91, .7, .37], tc: [1, .48, .42],
-      nm: [214, 219, 228, .85], nmTop: [255, 255, 255, .97], nmOut: [140, 145, 155, .75], nmChk: [233, 179, 95, .95], rankNo: [255, 164, 151], amberT: COL.hold, grayT: COL.out, erGlow: .55, erR: 1.25, erA: 1, erAs: [1, .86, .68, .48], erHalo: 0, d2: 1, koff: [.3, .2, .08] },
+      nm: [214, 219, 228, .85], nmTop: [255, 255, 255, .97], nmOut: [140, 145, 155, .75], nmChk: [233, 179, 95, .95], nmDim: [170, 175, 186, .5], rankNo: [255, 164, 151], rankMin: [255, 164, 151],
+      plate: [14, 15, 19], plateA: .8, badge: [255, 123, 107], badgeTx: [24, 10, 8], amberT: COL.hold, grayT: COL.out, erGlow: .55, erR: 1.25, erA: 1, erAs: [1, .86, .68, .48], erHalo: 0, d2: 1, koff: [.3, .2, .08] },
     light: { ink: [17, 18, 22], silver: [86, 92, 104], warm: [26, 27, 33], coral: [226, 82, 62], amber: [188, 120, 18], gray: [152, 156, 164], sand: [146, 92, 14], halo: [244, 243, 240], chip: [255, 255, 255], chipA: .94, pulse: [150, 26, 14], dots: [40, 44, 52], hot: [224, 80, 60],
       glInk: [.07, .075, .09], glHot: [.89, .32, .24], tb: [.07, .075, .09], tg: [.6, .61, .64], ta: [.74, .47, .07], tc: [.89, .32, .24],
-      nm: [44, 47, 54, .86], nmTop: [17, 18, 22, .97], nmOut: [128, 132, 140, .85], nmChk: [146, 92, 14, .95], rankNo: [192, 57, 43], amberT: [146, 92, 14], grayT: [128, 132, 140], erGlow: 0, erR: 1.2, erA: 1, erAs: [1, .96, .9, .82], erHalo: 1, d2: 1.7, koff: [.4, .24, .1] }
+      nm: [44, 47, 54, .86], nmTop: [17, 18, 22, .97], nmOut: [128, 132, 140, .85], nmChk: [146, 92, 14, .95], nmDim: [96, 100, 108, .62], rankNo: [192, 57, 43], rankMin: [192, 57, 43],
+      plate: [255, 255, 255], plateA: .95, badge: [192, 57, 43], badgeTx: [255, 255, 255], amberT: [146, 92, 14], grayT: [128, 132, 140], erGlow: 0, erR: 1.2, erA: 1, erAs: [1, .96, .9, .82], erHalo: 1, d2: 1.7, koff: [.4, .24, .1] }
   };
   let THEME = "dark", PAL = PALS.dark, INK, SILVER, WARM, CORAL, AMBER, GRAY, SAND;
   const LIGHT = (() => { const l = [-.42, .55, .72], n = Math.hypot(...l); return l.map(x => x / n); })();
@@ -24,6 +26,7 @@ const Holo = (() => {
   const B1 = 350, B2 = 950, B3 = 1550;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, p) => [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p, a[2] + (b[2] - a[2]) * p];
+  const mix4 = (a, b, p) => mix3(a, b, p).concat(a[3] + (b[3] - a[3]) * p);
   const wrapLng = x => ((x % 360) + 540) % 360 - 180;
   let W = 1, H = 1, DPR = 1, cx = 0, cy = 0, R0 = 100, raf = 0, last = now(), G2 = null, GP = null, KP = null, FP = null, bufG = null, bufK = null, bufF = null, KOFF = null;
   // G 지구본 · C 평면 지도 카메라(lk = log(화면 px/km)) · F 출발지 주변 점
@@ -230,16 +233,22 @@ const Holo = (() => {
   }
   const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
   function hudRects() { const pr = stage.getBoundingClientRect(), out = []; $$(".hud", stage).forEach(e => { const r = e.getBoundingClientRect(); if (r.width && r.height) out.push({ x: (r.left - pr.left) * DPR, y: (r.top - pr.top) * DPR, w: r.width * DPR, h: r.height * DPR }); }); return out; }
-  const segW = segs => segs.reduce((w, s) => { ctx.font = s.f; return w + ctx.measureText(s.t).width; }, 0);
+  const segW = segs => segs.reduce((w, s) => { if (s.badge) return w + s.w; ctx.font = s.f; return w + ctx.measureText(s.t).width; }, 0);
+  // 좁은 지도(휴대폰·작은 창)에서는 결과가 정리된 뒤 1~3순위 라벨만 남깁니다.
+  const compact = () => W / DPR < 520;
+  // 결과 정리 정도(0→1): ④ 순위가 나온 직후부터 순위 밖 병원을 뒤로 물립니다.
+  const settle = tt => S.res ? clamp((tt - S.res.B4 - 150) / 500, 0, 1) : 0;
+  function rrect(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function targetPos(lat0, lng0, k) { const pos = new Map(); for (const n of S.nodes) pos.set(n, projAt(lat0, lng0, k, n.lat, n.lng, [0, 0])); pos.o = S.origin ? projAt(lat0, lng0, k, S.origin.lat, S.origin.lng, [0, 0]) : [cx, cy]; pos.k = k; return pos; }
   // 라벨은 병원 점에서 바깥쪽부터 16방향 × 4거리를 시도하고, 떨어진 자리에 놓이면 지시선을 긋습니다. 위치는 병원 점 기준 상대값으로 저장해 카메라가 움직여도 따라갑니다.
   function placeLabels(pos, items, extra) {
-    const placed = hudRects(), pad = 8 * DPR, [ox, oy] = pos.o;
+    const placed = hudRects().map(r => Object.assign(r, { wt: 5 })), pad = 8 * DPR, [ox, oy] = pos.o;
     const fits = r => r.x >= pad && r.x + r.w <= W - pad && r.y >= pad && r.y + r.h <= H - pad && !placed.some(q => hit(q, r));
-    const ob = (x, y, r) => { const o = { x: x - r, y: y - r, w: r * 2, h: r * 2 }; placed.push(o); return o; };
+    const ob = (x, y, r, wt = 1) => { const o = { x: x - r, y: y - r, w: r * 2, h: r * 2, wt }; placed.push(o); return o; };
+    const ov = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
     const inside = (q, x, y) => x > q.x && x < q.x + q.w && y > q.y && y < q.y + q.h;
     if (!S.approx) ob(ox, oy, 16 * DPR);
-    for (const n of S.nodes) { const p = pos.get(n); n.ob = ob(p[0], p[1], (n.h && n.h.rank ? 13 : 7) * DPR); }
+    for (const n of S.nodes) { const p = pos.get(n); n.ob = ob(p[0], p[1], (n.h && n.h.rank ? 13 : 7) * DPR, n.h && n.h.rank ? 40 : 1); }
     (extra || []).forEach(([x, y]) => ob(x, y, 3 * DPR));
     S.chip = null;
     if (!S.approx && S.oname) {
@@ -247,24 +256,35 @@ const Holo = (() => {
       ctx.font = "500 " + 10 * DPR + "px " + FONT; const tw0 = ctx.measureText("출발").width;
       ctx.font = "600 " + 12 * DPR + "px " + FONT; const tw1 = ctx.measureText(name).width;
       const w = 32 * DPR + tw0 + tw1, hh = 26 * DPR;
-      let L = { x: ox - w / 2, y: oy - 30 * DPR - hh, w, h: hh };
-      if (!fits(L)) { const L2 = { x: ox - w / 2, y: oy + 26 * DPR, w, h: hh }; if (fits(L2)) L = L2; }
-      placed.push(L); S.chip = { ox: L.x - ox, oy: L.y - oy, w, h: hh, name, tw0 };
+      // 출발지 이름표: 위 · 아래 · 옆 · 비스듬히 8곳 중 빈자리. 없으면 1~3순위 표시를 가장 덜 가리는 곳에 둡니다.
+      const up = -30 * DPR - hh, dn = 26 * DPR, cands = [[-w / 2, up], [-w / 2, dn], [-w - 16 * DPR, -hh / 2], [16 * DPR, -hh / 2], [-w + 12 * DPR, up], [-12 * DPR, up], [-w + 12 * DPR, dn], [-12 * DPR, dn]];
+      let L = null, cost = Infinity;
+      for (const [dx, dy] of cands) {
+        const r = { x: ox + dx, y: oy + dy, w, h: hh }; if (fits(r)) { L = r; break; }
+        const c = placed.reduce((a, q) => a + ov(r, q) * (q.wt || 1), 0) + (r.x < pad || r.y < pad || r.x + w > W - pad || r.y + hh > H - pad ? 1e9 : 0);
+        if (c < cost) { cost = c; L = Object.assign(r, { worst: true }); }
+      }
+      if (L.worst) delete L.worst;
+      L.wt = 30; placed.push(L); S.chip = { ox: L.x - ox, oy: L.y - oy, w, h: hh, name, tw0 };
     }
     for (const it of items) {
-      const n = it.n, p = pos.get(n), segs = it.segs, w = segW(segs), hh = (it.big ? 13 : 12) * DPR * 1.3, g = (it.big ? 13 : 9) * DPR;
-      const out = Math.atan2(p[1] - oy, p[0] - ox) || 0; let best = null;
-      search: for (const rad of [g, g + 16 * DPR, g + 32 * DPR, g + 54 * DPR]) for (let j = 0; j < 16; j++) {
+      const n = it.n, p = pos.get(n), segs = it.segs, padL = it.pill ? 5 * DPR : 0, w = segW(segs) + padL + (it.pill ? 11 * DPR : 0), hh = it.pill ? 25 * DPR : (it.big ? 13 : 12) * DPR * 1.3, g = (it.pill ? 15 : it.big ? 13 : 9) * DPR;
+      const out = Math.atan2(p[1] - oy, p[0] - ox) || 0; let best = null, alt = null, altCost = Infinity;
+      const radii = [g, g + 16 * DPR, g + 32 * DPR, g + 54 * DPR].concat(it.pill ? [g + 80 * DPR, g + 110 * DPR] : []);
+      search: for (const rad of radii) for (let j = 0; j < 16; j++) {
         const ang = out + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * TAU / 16, ca = Math.cos(ang), sa = Math.sin(ang), lead = rad > g + 1;
         const ax = p[0] + ca * rad, ay = p[1] + sa * rad, gx = lead ? ca * 4 * DPR : 0, gy = lead ? sa * 3 * DPR : 0;
         const r = { x: (ca > .35 ? ax : ca < -.35 ? ax - w : ax - w / 2) + gx, y: (sa > .35 ? ay : sa < -.35 ? ay - hh : ay - hh / 2) + gy, w, h: hh };
-        if (!fits(r)) continue;
-        if (lead) { const x0 = p[0] + ca * (it.big ? 9 : 5) * DPR, y0 = p[1] + sa * (it.big ? 9 : 5) * DPR; if ([.3, .55, .8].some(u => placed.some(q => q !== n.ob && inside(q, x0 + (ax - x0) * u, y0 + (ay - y0) * u)))) continue; r.lead = [x0, y0, ax, ay]; }
-        best = r; break search;
+        if (r.x < pad || r.y < pad || r.x + w > W - pad || r.y + hh > H - pad) continue;
+        let blocked = false;
+        if (lead) { const x0 = p[0] + ca * (it.big ? 9 : 5) * DPR, y0 = p[1] + sa * (it.big ? 9 : 5) * DPR; blocked = [.3, .55, .8].some(u => placed.some(q => q !== n.ob && inside(q, x0 + (ax - x0) * u, y0 + (ay - y0) * u))); r.lead = [x0, y0, ax, ay]; }
+        if (!blocked && !placed.some(q => hit(q, r))) { best = r; break search; }
+        // 1~3순위는 빈자리가 없어도 꼭 그려야 하므로, 다른 순위 표시·출발지 이름표를 가장 덜 가리는 자리를 기억해 둡니다.
+        if (it.must) { const c = placed.reduce((a, q) => a + ov(r, q) * (q.wt || 1), 0) + (blocked ? 400 * DPR * DPR : 0) + rad * 4 * DPR; if (c < altCost) { altCost = c; alt = r; } }
       }
-      if (!best && it.must) best = { x: clamp(p[0] + g, pad, W - w - pad), y: p[1] - hh / 2, w, h: hh };
-      n[it.slot] = best ? { ox: best.x - p[0], oy: best.y - p[1], w, h: hh, segs, lead: best.lead ? best.lead.map((v, i) => v - p[i % 2]) : null } : null;
-      if (best) { placed.push(best); if (best.lead) { const [x0, y0, x1, y1] = best.lead; [.3, .55, .8].forEach(u => ob(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 2 * DPR)); } }
+      if (!best && it.must) best = alt || { x: clamp(p[0] + g, pad, W - w - pad), y: p[1] - hh / 2, w, h: hh };
+      n[it.slot] = best ? { ox: best.x - p[0], oy: best.y - p[1], w, h: hh, segs, pill: !!it.pill, padL, lead: best.lead ? best.lead.map((v, i) => v - p[i % 2]) : null } : null;
+      if (best) { best.wt = it.pill ? 30 : 1; placed.push(best); if (best.lead) { const [x0, y0, x1, y1] = best.lead; [.3, .55, .8].forEach(u => ob(x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, 2 * DPR, it.pill ? 30 : 1)); } }
     }
     S.ringLabs = [];
     if (!S.approx && S.ring) {
@@ -279,33 +299,46 @@ const Holo = (() => {
     const pos = targetPos(C.lat, C.lng, kd());
     placeLabels(pos, S.nodes.slice().sort((a, b) => a.km - b.km).map(n => ({ n, slot: "labW", segs: [{ t: n.short, f: "500 " + 11.5 * DPR + "px " + FONT, role: "name" }, { t: "  " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + MONO, c: "ink", a: .45 }] })));
   }
-  // 결과 라벨 조각마다 나타나는 시각이 다릅니다: 이름(처음) · 제외/확인 필요(①②) · 도착 시간(도착 순간) · 순위 번호(④) · 직선 최단(마지막)
+  // 결과 라벨 조각마다 나타나는 시각이 다릅니다: 이름(처음) · 제외/확인 필요(①②) · 도착 시간(도착 순간) · 순위 배지(④) · 직선 최단(마지막)
+  // 1~3순위는 순위 배지가 붙은 이름표(바탕 판)로, 나머지는 작은 글자로 그립니다.
   function resultSegs(n) {
-    const x = n.h, R = S.res, segs = [];
-    if (x.rank) segs.push({ t: x.rank + "  ", f: "600 " + 11 * DPR + "px " + MONO, c: "rankNo", a: 1, show: R.B4 + (x.rank - 1) * 150 });
-    segs.push({ t: x.short, f: "500 " + 12 * DPR + "px " + FONT, role: "name", show: 0 });
-    if (x.st !== "out" && x.min != null) segs.push({ t: "  " + x.min + "분", f: "500 " + 11.5 * DPR + "px " + FONT, c: "ink", a: .6, show: n.arr != null ? n.arr : R.B4 });
+    const x = n.h, R = S.res, segs = [], top = !!x.rank, cp = compact();
+    if (top) segs.push({ badge: x.rank, w: 22 * DPR, show: R.B4 + (x.rank - 1) * 150 });
+    segs.push({ t: x.short, f: (top ? "600 " + (cp ? 12 : 12.5) * DPR : "500 " + 11.5 * DPR) + "px " + FONT, role: "name", show: 0 });
+    if (x.st !== "out" && x.min != null) segs.push({ t: "  " + x.min + "분", f: (top ? "600 " + 12 * DPR : "500 " + 11 * DPR) + "px " + FONT, c: x.rank === 1 ? "rankMin" : "ink", a: top ? (x.rank === 1 ? 1 : .82) : .6, show: n.arr != null ? n.arr : R.B4 });
     const tag = x.st === "out" ? "제외" : x.chk ? x.why : "";
     if (tag) segs.push({ t: "  " + tag, f: "500 " + 10.5 * DPR + "px " + FONT, c: x.st === "out" ? "grayT" : "amberT", a: .95, show: x.st === "out" ? B1 : B2 });
-    if (S.nearest === n && x.rank !== 1) segs.push({ t: "  직선 최단 " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + FONT, c: "sand", a: .95, show: R.B4 + 500 });
+    if (S.nearest === n && x.rank !== 1 && !(top && cp)) segs.push({ t: "  직선 최단 " + fmtKm(n.km), f: "500 " + 10.5 * DPR + "px " + FONT, c: "sand", a: .95, show: R.B4 + 500 });
     return segs;
   }
   function layoutResult(lat0, lng0, k) {
     const pos = targetPos(lat0, lng0, k), extra = [];
     if (!S.approx) for (const n of S.nodes) if (n.h && n.h.rank) { const p = pos.get(n), P = curve(pos.o[0], pos.o[1], p[0], p[1], n.bend || .12); for (let i = 6; i < 43; i += 5) extra.push([P[i * 2], P[i * 2 + 1]]); }
     const prio = n => n.h.rank ? n.h.rank : 10 + ST_ORDER[n.h.st];
-    placeLabels(pos, S.nodes.filter(n => n.h).sort((a, b) => prio(a) - prio(b) || a.km - b.km).map(n => ({ n, slot: "labR", big: !!n.h.rank, must: !!n.h.rank, segs: resultSegs(n) })), extra);
+    placeLabels(pos, S.nodes.filter(n => n.h).sort((a, b) => prio(a) - prio(b) || a.km - b.km).map(n => ({ n, slot: "labR", big: !!n.h.rank, pill: !!n.h.rank, must: !!n.h.rank, segs: resultSegs(n) })), extra);
   }
   // ── 출발지 주변 그리기 ──
   const nodeIn = (n, t) => E.out(clamp((t - n.born) / 450, 0, 1));
-  function drawLab(n, lab, base, tt, nameCol) {
+  // segMul: 이름을 뺀 조각(도착 시간·태그)과 지시선의 진하기. 순위 밖 병원을 뒤로 물릴 때 씁니다.
+  function drawLab(n, lab, base, tt, nameCol, segMul = 1) {
     if (!lab || base <= .01) return;
-    const y = n.sy + lab.oy + lab.h / 2;
-    if (lab.lead) { ctx.strokeStyle = n.h && n.h.rank && S.res && tt >= S.res.B4 ? rgba(CORAL, .5 * base) : rgba(INK, .24 * base); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(n.sx + lab.lead[0], n.sy + lab.lead[1]); ctx.lineTo(n.sx + lab.lead[2], n.sy + lab.lead[3]); ctx.stroke(); }
+    const y = n.sy + lab.oy + lab.h / 2, top = n.h && n.h.rank, pp = lab.pill ? clamp((tt - lab.segs[0].show) / 350, 0, 1) : 0;
+    if (lab.lead) { ctx.strokeStyle = top && S.res && tt >= S.res.B4 ? rgba(CORAL, .5 * base) : rgba(INK, .24 * base * segMul); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(n.sx + lab.lead[0], n.sy + lab.lead[1]); ctx.lineTo(n.sx + lab.lead[2], n.sy + lab.lead[3]); ctx.stroke(); }
     let x = n.sx + lab.ox;
+    if (pp > 0) {
+      const r = lab.h / 2; rrect(x, n.sy + lab.oy, lab.w, lab.h, r);
+      ctx.fillStyle = rgba(PAL.plate, PAL.plateA * pp * base); ctx.fill();
+      ctx.strokeStyle = top === 1 ? rgba(CORAL, .62 * pp * base) : rgba(INK, .16 * pp * base); ctx.lineWidth = (top === 1 ? 1.2 : 1) * DPR; ctx.stroke();
+    }
+    x += lab.padL || 0;
     for (const s of lab.segs) {
-      ctx.font = s.f; const w = ctx.measureText(s.t).width, p = s.show == null ? 1 : clamp((tt - s.show) / 350, 0, 1);
-      if (p > 0) text(s.t, x, y, s.f, s.role === "name" ? nameCol : typeof s.c === "string" ? PAL[s.c] : s.c, (s.role === "name" ? nameCol[3] : s.a) * p * base);
+      const p = s.show == null ? 1 : clamp((tt - s.show) / 350, 0, 1);
+      if (s.badge) {
+        if (p > 0) { const r = 8.5 * DPR, bx = x + r, q = E.out(p); dot(bx, y, r * (.6 + .4 * q), PAL.badge, p * base); ctx.font = "700 " + 10.5 * DPR + "px " + MONO; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = rgba(PAL.badgeTx, p * base); ctx.fillText(String(s.badge), bx, y + .5 * DPR); }
+        x += s.w; continue;
+      }
+      ctx.font = s.f; const w = ctx.measureText(s.t).width;
+      if (p > 0) text(s.t, x, y, s.f, s.role === "name" ? nameCol : typeof s.c === "string" ? PAL[s.c] : s.c, (s.role === "name" ? nameCol[3] : s.a * segMul) * p * base);
       x += w;
     }
   }
@@ -351,25 +384,24 @@ const Holo = (() => {
   function nameColor(n, tt) {
     const x = n.h, R = S.res;
     if (x.rank && tt >= R.B4 + (x.rank - 1) * 150) return PAL.nmTop;
-    if (x.st === "out" && tt >= B1) return PAL.nmOut;
-    if (x.chk && tt >= B2) return PAL.nmChk;
-    return PAL.nm;
+    const c = x.st === "out" && tt >= B1 ? PAL.nmOut : x.chk && tt >= B2 ? PAL.nmChk : PAL.nm, f = x.rank ? 0 : settle(tt);
+    return f > 0 ? mix4(c, PAL.nmDim, f) : c;
   }
   function drawResNode(n, t, tt) {
     const x = n.h, R = S.res, A = C.alpha * nodeIn(n, t); if (!x || A <= .01) return;
-    const X = n.sx, Y = n.sy;
+    const X = n.sx, Y = n.sy, f = settle(tt), dn = x.rank ? 1 : 1 - .45 * f;
     if (x.st === "out") {
       const p = E.out(clamp((tt - B1) / 450, 0, 1));
       if (p < 1) dot(X, Y, 2.7 * DPR * (1 - p), SILVER, .9 * A);
-      xmark(X, Y, 3.2 * DPR * p, GRAY, .8 * A * p);
+      xmark(X, Y, 3.2 * DPR * p, GRAY, .8 * A * p * dn);
     } else {
       const rk = x.rank, rp = rk ? E.out(clamp((tt - R.B4 - (rk - 1) * 150) / 450, 0, 1)) : 0, cp = x.chk ? E.out(clamp((tt - B2) / 450, 0, 1)) : 0, arr = n.arr != null ? tt - n.arr : -1;
-      if (rp < 1) dot(X, Y, (arr >= 0 ? 3 : 2.7) * DPR, arr >= 0 ? (x.chk ? AMBER : INK) : SILVER, (arr >= 0 ? 1 : .9) * A * (1 - rp));
+      if (rp < 1) dot(X, Y, (arr >= 0 ? 3 : 2.7) * DPR, arr >= 0 ? (x.chk ? AMBER : INK) : SILVER, (arr >= 0 ? 1 : .9) * A * (1 - rp) * dn);
       if (rp > 0) {
-        const r = (rk === 1 ? 4.6 : 3.8) * DPR * rp; dot(X, Y, r, CORAL, A * rp); ring(X, Y, r + (rk === 1 ? 7 : 5.5) * DPR, CORAL, (rk === 1 ? .9 : .5) * A * rp, 1.2);
+        const r = (rk === 1 ? 5 : 4.2) * DPR * rp; dot(X, Y, r + 2.5 * DPR, PAL.halo, .7 * A * rp); dot(X, Y, r, CORAL, A * rp); ring(X, Y, r + (rk === 1 ? 7 : 5.5) * DPR, CORAL, (rk === 1 ? .9 : .7) * A * rp, 1.2);
         if (rk === 1 && rp >= 1 && !REDUCED) { const u = (t % 2600) / 2600; ring(X, Y, r + (7 + 22 * E.out(u)) * DPR, CORAL, .45 * (1 - u) * A, 1); }
       }
-      if (cp > 0) { ring(X, Y, (rk ? 13.5 : 6.5) * DPR, AMBER, .9 * A * cp, 1.3); if (cp < 1) ring(X, Y, (6 + 20 * cp) * DPR, AMBER, .6 * (1 - cp) * A, 1); }
+      if (cp > 0) { ring(X, Y, (rk ? 14 : 6.5) * DPR, AMBER, .9 * A * cp * (rk ? 1 - .35 * f : 1 - .55 * f), rk ? 1.1 : 1.3); if (cp < 1) ring(X, Y, (6 + 20 * cp) * DPR, AMBER, .6 * (1 - cp) * A, 1); }
       if (arr >= 0 && arr < 600) { const u = arr / 600; ring(X, Y, (5 + 18 * E.out(u)) * DPR, x.chk ? AMBER : INK, .7 * (1 - u) * A, 1.1); }
     }
     if (n === S.hov || n === S.sel) ring(X, Y, (x.rank ? 19 : 11) * DPR, INK, .85 * A, 1.1);
@@ -379,7 +411,7 @@ const Holo = (() => {
     const R = S.res, tt = t - S.rt0, A = C.alpha, la = A * clamp((tt + 150) / 350, 0, 1);
     for (const n of S.gone) { const a = A * (1 - clamp((t - n.died) / 350, 0, 1)); if (a > .01) dot(n.sx, n.sy, 2.7 * DPR, SILVER, .9 * a); }
     const nr = S.nearest;
-    if (nr && nr.h.rank !== 1 && !S.approx) { const p = E.out(clamp((tt - R.B4 - 450) / 700, 0, 1)); if (p > 0) { ctx.setLineDash([3 * DPR, 5 * DPR]); ctx.strokeStyle = rgba(AMBER, .55 * A); ctx.lineWidth = 1.1 * DPR; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(o[0] + (nr.sx - o[0]) * p, o[1] + (nr.sy - o[1]) * p); ctx.stroke(); ctx.setLineDash([]); } }
+    if (nr && nr.h.rank !== 1 && !S.approx) { const p = E.out(clamp((tt - R.B4 - 450) / 700, 0, 1)); if (p > 0) { ctx.setLineDash([3 * DPR, 5 * DPR]); ctx.strokeStyle = rgba(INK, .3 * A); ctx.lineWidth = 1.1 * DPR; ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(o[0] + (nr.sx - o[0]) * p, o[1] + (nr.sy - o[1]) * p); ctx.stroke(); ctx.setLineDash([]); } }
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     for (const n of R.racers) {
       if (tt < B3 - 300) break;
@@ -402,7 +434,13 @@ const Holo = (() => {
       }
     }
     for (const n of S.nodes) drawResNode(n, t, tt);
-    for (const n of S.nodes) if (n.h) drawLab(n, n.labR, la * nodeIn(n, t), tt, nameColor(n, tt));
+    const f = settle(tt), cp = compact();
+    for (const n of S.nodes) if (n.h) {
+      const top = !!n.h.rank, focus = n === S.hov || n === S.sel;
+      // 순위 밖: 넓은 지도에서는 옅게 남기고, 좁은 지도에서는 직선 최단만 남깁니다(누르면 다시 보임).
+      const keep = top || focus ? 1 : cp ? (n === S.nearest ? .85 : 0) : 1;
+      drawLab(n, n.labR, la * nodeIn(n, t) * (1 - f * (1 - keep)), tt, focus && !top ? PAL.nm : nameColor(n, tt), top || focus ? 1 : 1 - .45 * f);
+    }
     if (R.racers.length && tt >= B3 - 200 && tt <= R.B4 + 1500) {
       const a = A * clamp((tt - B3 + 200) / 300, 0, 1) * (1 - clamp((tt - R.B4 - 1000) / 500, 0, 1)), mins = clamp((tt - B3) / R.rate, 0, R.maxMin);
       text("경과 " + Math.floor(mins) + "분", W - 18 * DPR, H - 58 * DPR, "600 " + 15 * DPR + "px " + FONT, INK, .95 * a, "right");
@@ -470,6 +508,7 @@ const Holo = (() => {
         else {
           if (x.chk) c = mix3(c, PAL.ta, clamp((tt - B2) / 450, 0, 1));
           if (x.rank) { const p = clamp((tt - R.B4 - (x.rank - 1) * 150) / 450, 0, 1); c = mix3(c, PAL.tc, p); a *= 1 + .3 * p; }
+          else a *= 1 - .5 * settle(tt);
         }
       }
       T[i * 4] = c[0]; T[i * 4 + 1] = c[1]; T[i * 4 + 2] = c[2]; T[i * 4 + 3] = a;
