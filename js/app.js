@@ -5,7 +5,7 @@
 const EXAMPLES = ["보라매공원, 50대 다리골절 노인", "강남역, 60대 남성 갑작스러운 가슴 통증", "잠실 롯데월드, 7살 아이 열성 경련", "광화문광장, 70대 여성 한쪽 팔다리 마비"];
 const STAGE_HUD = [null, ["위치 확인", "카카오 장소 검색으로 좌표를 찾고 있어요"], ["응급실 후보 탐색", "주변 응급실 10곳을 찾고 있어요"], ["실시간 병상 확인", "가용 병상·중증질환 수용·제한 메시지를 확인하고 있어요"], ["도로 이동 시간 계산", "실시간 교통으로 이동 시간을 계산하고 있어요"], ["AI 판단", "에이전트가 순위를 판단하고 있어요"]];
 const GREET = /^Hello! I'm (.+?)\. How can I help you today\?$/;
-const App = { store: null, connected: false, heard: false, turn: null, data: null, demo: false, timer: 0, pt: 0, quiet: 0, di: 0 };
+const App = { store: null, connected: false, heard: false, turn: null, data: null, demo: false, timer: 0, pt: 0, quiet: 0, di: 0, swapT: 0 };
 const q = $("#q"), sendBtn = $("#send"), chipsEl = $("#chips"), noticeEl = $("#notice");
 const IDLE_META = "전국 응급실 " + Geo.ER.length + "곳 · 국립중앙의료원";
 // 결과 박자마다 지도 위 상태 문구: 에이전트의 판단 순서(필요한 치료 → 병상·수용 제한 → 도착 시간 → 순위)
@@ -73,10 +73,40 @@ function submit(text) {
   App.store.dispatch({ type: "WEB_CHAT/SEND_MESSAGE", payload: { text } });
   q.value = ""; autosize(); renderSuggested([]); beginTurn(text, false);
 }
+// 모바일 패널 순서: 분석하는 동안은 지도 바로 밑에 분석 단계, AI 판단이 끝나면 추천 순위가 올라와 분석 단계와 자리를 바꿉니다.
+// 화면 순서만 CSS로 바꾸고(body.rank-up), 패널은 바뀐 자리로 미끄러지듯 옮깁니다. 멀리 가는 패널은 제자리에서 흐려졌다가 새 자리에서 나타납니다.
+const SWAP_AT = 800, RISE_AT = 900;
+function reorder(up, change) {
+  const B = document.body, els = [$(".pipe"), $("#rank"), $(".brief"), $(".foot")];
+  const anim = MOBILE() && !REDUCED && B.classList.contains("rank-up") !== up;
+  const y0 = anim ? els.map(e => e.getBoundingClientRect().top) : null;
+  if (change) change();
+  B.classList.toggle("rank-up", up);
+  if (!anim) return;
+  const far = innerHeight * .6, ease = "cubic-bezier(.22, .8, .2, 1)";
+  els.forEach((e, i) => {
+    if (e._swap) e._swap.cancel();
+    const dy = y0[i] - e.getBoundingClientRect().top; if (Math.abs(dy) < 2) return;
+    const s = dy < 0 ? 1 : -1;
+    const a = e._swap = Math.abs(dy) <= far
+      ? e.animate([{ transform: "translateY(" + dy + "px)" }, { transform: "none" }], { duration: 760, easing: ease })
+      : e.animate([
+        { transform: "translateY(" + dy + "px)", opacity: 1, easing: "cubic-bezier(.4, 0, 1, 1)" },
+        { transform: "translateY(" + (dy + s * 28) + "px)", opacity: 0, offset: .3 },
+        { transform: "translateY(" + -s * 28 + "px)", opacity: 0, offset: .34, easing: ease },
+        { transform: "none", opacity: 1 }], { duration: 900 });
+    // 움직이는 동안만 바탕을 불투명하게 해, 겹쳐 지나가는 패널의 글자가 비치지 않게 합니다.
+    e.classList.add("is-swapping");
+    a.onfinish = a.oncancel = () => { if (e._swap === a) { e._swap = null; e.classList.remove("is-swapping"); } };
+  });
+}
 function beginTurn(text, demo, sample) {
-  const t = App.turn = { text, demo, paused: false, at: sample ? sample.at : null }; App.data = null;
-  document.body.classList.add("is-working"); document.body.classList.remove("is-result");
-  Holo.locate(); Pipe.start(demo); Rank.scanning(); Rank.request(text); setCoord(null); $("#partial").hidden = true; clearTimeout(App.pt);
+  const t = App.turn = { text, demo, paused: false, at: sample ? sample.at : null }; App.data = null; clearTimeout(App.swapT);
+  reorder(false, () => {
+    document.body.classList.add("is-working"); document.body.classList.remove("is-result");
+    Holo.locate(); Pipe.start(demo); Rank.scanning(); Rank.request(text); setCoord(null); $("#partial").hidden = true;
+  });
+  clearTimeout(App.pt);
   setMeta(demo ? "샘플 시연 · 기록 재생" : "실시간 수집 중");
   clearTimeout(App.timer); if (!demo) App.timer = setTimeout(() => endTurn(), 180000);
   findOrigin(t, sample);
@@ -128,7 +158,10 @@ function showResult(d) {
   document.body.classList.remove("is-working"); document.body.classList.add("is-result");
   setHud("AI 판단 결과", "에이전트의 판단 순서대로 지도에 보여 드려요");
   Holo.setData(d);
-  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + t.at : null); Rank.render(d, 0); if (d.origin.lat != null) setCoord(d.origin);
+  // 모바일: 분석 단계가 모두 완료된 것을 잠깐 보여 준 뒤 추천 순위가 올라오고, 카드는 그때 맞춰 떠오릅니다.
+  const phone = MOBILE() && !REDUCED; clearTimeout(App.swapT);
+  Pipe.finish(true, t && t.demo ? "샘플 시연 · " + t.at : null); Rank.render(d, phone ? RISE_AT : 0); if (d.origin.lat != null) setCoord(d.origin);
+  if (phone) App.swapT = setTimeout(() => reorder(true), SWAP_AT); else reorder(true);
   const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), best = recs[0];
   setMeta("후보 " + d.hs.filter(x => x.lat != null && x.lng != null).length + " · 추천 " + recs.length + (t && t.demo ? " · 샘플" : " · 실시간"));
   const pn = $("#partial"); pn.hidden = !d.partial;

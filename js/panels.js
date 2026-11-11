@@ -61,8 +61,9 @@ const Rank = (() => {
     });
   }
   function bind(el, i) { el.addEventListener("click", e => { if (e.target.closest("a")) return; pickCb(i); }); el.addEventListener("keydown", e => { if (e.key === "Enter") pickCb(i); }); el.addEventListener("mouseenter", () => hoverCb(i)); el.addEventListener("mouseleave", () => hoverCb(-1)); }
+  // delay: 카드가 떠오르기 시작할 때까지 기다리는 시간(ms). 모바일에서는 순위판이 올라오는 때에 맞춥니다.
   function render(d, delay) {
-    const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), D = Math.max(0, delay * .55);
+    const recs = d.hs.filter(x => x.rank).sort((a, b) => a.rank - b.rank), D = Math.max(0, delay || 0);
     const times = d.hs.map(x => x.time).filter(Boolean).sort(); rankTime.textContent = times.length ? times[times.length - 1] + " 기준" : "";
     if (d.need) { needEl.replaceChildren(h("b", null, "필요한 치료"), h("span", null, d.need)); needEl.hidden = false; } else needEl.hidden = true;
     top3.replaceChildren();

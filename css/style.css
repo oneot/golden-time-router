@@ -74,8 +74,6 @@ body.is-error .status i { background: var(--coral); box-shadow: 0 0 0 3px rgba(2
 .send:not(:disabled):hover { transform: translateY(-1px); }
 .composer::after { content: ""; position: absolute; left: 0; bottom: 0; width: 40%; height: 1.5px; background: linear-gradient(90deg, transparent, var(--coral), transparent); opacity: 0; transform: translateX(-100%); }
 body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease) infinite; }
-.hint { margin: 9px 18px 0; font-size: 11.5px; color: var(--dim); }
-.hint kbd { padding: 1px 6px; border-radius: 6px; border: 1px solid var(--line-2); font: 500 10px/1.5 var(--mono); color: var(--muted); }
 .chips { display: flex; gap: 6px; margin: 12px 0 16px; padding: 0 18px; overflow-x: auto; scrollbar-width: none; -webkit-mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 32px), transparent); mask: linear-gradient(90deg, transparent, #000 18px, #000 calc(100% - 32px), transparent); }
 .chips::-webkit-scrollbar { display: none; }
 .chip { flex: none; height: 30px; padding: 0 13px; border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, .03); color: var(--ink-2); font-size: 12.5px; cursor: pointer; white-space: nowrap; transition: background .3s var(--ease), color .3s var(--ease), border-color .3s var(--ease); }
@@ -252,7 +250,11 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 }
 @media (max-width: 760px) {
   :root { --gap: 12px; }
-  .app { padding: 8px 12px 10px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "mission" "holo" "rank" "pipe" "brief" "foot"; }
+  /* 분석하는 동안은 지도 바로 밑에 분석 단계, AI 판단이 끝나면(body.rank-up) 추천 순위가 그 자리로 올라옵니다. */
+  .app { padding: 8px 12px 10px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "mission" "holo" "pipe" "rank" "brief" "foot"; }
+  body.rank-up .app { grid-template-areas: "top" "mission" "holo" "rank" "pipe" "brief" "foot"; }
+  /* 자리가 바뀌는 패널은 스크롤 기준에서 빼서, 브라우저가 패널을 따라 화면을 옮기지 않고 보던 자리가 그대로 남게 합니다. */
+  .pipe, .rank, .brief, .foot { overflow-anchor: none; }
   .stage { height: min(112vw, 560px); min-height: 380px; }
   .brief { height: 480px; }
   .top { flex-wrap: wrap; height: auto; gap: 8px; padding-top: 4px; }
@@ -263,8 +265,9 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
   .hud-bl { max-width: 94%; gap: 4px 12px; }
   .hud-br { display: none; }
   .foot { height: auto; white-space: normal; flex-wrap: wrap; }
+  body .panel.is-swapping { background-color: var(--bg); }
 }
-@media (min-width: 1181px) and (max-height: 1000px) { .m-sub, .hint, .stages span { display: none; } .m-title { margin-top: 10px; font-size: 20px; } .stages li { padding-bottom: 9px; } .composer { margin-top: 12px; } .pipe-note { margin-bottom: 12px; } }
+@media (min-width: 1181px) and (max-height: 1000px) { .m-sub, .stages span { display: none; } .m-title { margin-top: 10px; font-size: 20px; } .stages li { padding-bottom: 9px; } .composer { margin-top: 12px; } .pipe-note { margin-bottom: 12px; } }
 @media (min-width: 1181px) and (max-height: 760px) { .brief { flex-basis: 200px; } .hud-state { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
 
