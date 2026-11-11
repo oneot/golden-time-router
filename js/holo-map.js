@@ -141,13 +141,12 @@ const Holo = (() => {
   function drawKoreaLabel() {
     const v = vec(KOREA[0], KOREA[1]); gproj(v[0], v[1], v[2], tmp);
     const a = G.label * G.alpha * G.intro * smooth(.3, .6, tmp[2]); if (a <= .01 || !tmp[3]) return;
-    const t1 = "대한민국 응급실 " + Geo.ER.length + "곳", t2 = "이 서비스가 보는 유일한 지역", f1 = "600 " + 12 * DPR + "px " + FONT, f2 = "400 " + 10.5 * DPR + "px " + FONT;
-    ctx.font = f1; let tw = ctx.measureText(t1).width; ctx.font = f2; tw = Math.max(tw, ctx.measureText(t2).width);
+    const t1 = "대한민국 응급실 " + Geo.ER.length + "곳", f1 = "600 " + 12 * DPR + "px " + FONT;
+    ctx.font = f1; const tw = ctx.measureText(t1).width;
     // 글자는 늘 한국 오른쪽 위에 적되, 화면 밖으로 나가면 안쪽으로 당깁니다(좁은 화면에서 지구본 대륙 위를 덮지 않게).
     const x = tmp[0] + 8 * DPR, y = tmp[1] - 6 * DPR, ly = y - 26 * DPR, tx = Math.min(x + 50 * DPR, W - 10 * DPR - tw), ex = Math.min(x + 30 * DPR, tx - 20 * DPR);
     ctx.strokeStyle = rgba(WHITE, .32 * a); ctx.lineWidth = DPR; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ly); ctx.lineTo(tx - 6 * DPR, ly); ctx.stroke();
     text(t1, tx, ly, f1, WHITE, .92 * a);
-    text(t2, tx, ly + 16 * DPR, f2, WHITE, .5 * a);
   }
 
   // ── 한반도 지도: 전국 응급실과 출발지 핀 ──
