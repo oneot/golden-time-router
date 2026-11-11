@@ -13,14 +13,14 @@ const Holo = (() => {
   const PALS = {
     dark: { ink: [255, 255, 255], silver: COL.alt, warm: [246, 241, 233], coral: COL.rec, amber: COL.hold, gray: COL.out, sand: [240, 201, 138], halo: [7, 8, 11], chip: [9, 10, 14], chipA: .86, pulse: [255, 226, 220], dots: [214, 221, 235], hot: [255, 153, 133],
       glInk: [.84, .87, .93], glHot: [1, .6, .52], tb: [.84, .87, .93], tg: [.5, .52, .56], ta: [.91, .7, .37], tc: [1, .48, .42],
-      nm: [214, 219, 228, .85], nmTop: [255, 255, 255, .97], nmOut: [140, 145, 155, .75], nmChk: [233, 179, 95, .95], rankNo: [255, 164, 151], amberT: COL.hold, grayT: COL.out, erGlow: .55, erR: 1.25, erA: 1 },
+      nm: [214, 219, 228, .85], nmTop: [255, 255, 255, .97], nmOut: [140, 145, 155, .75], nmChk: [233, 179, 95, .95], rankNo: [255, 164, 151], amberT: COL.hold, grayT: COL.out, erGlow: .55, erR: 1.25, erA: 1, erAs: [1, .86, .68, .48], erHalo: 0, d2: 1, koff: [.3, .2, .08] },
     light: { ink: [17, 18, 22], silver: [86, 92, 104], warm: [26, 27, 33], coral: [226, 82, 62], amber: [188, 120, 18], gray: [152, 156, 164], sand: [146, 92, 14], halo: [244, 243, 240], chip: [255, 255, 255], chipA: .94, pulse: [150, 26, 14], dots: [40, 44, 52], hot: [224, 80, 60],
       glInk: [.07, .075, .09], glHot: [.89, .32, .24], tb: [.07, .075, .09], tg: [.6, .61, .64], ta: [.74, .47, .07], tc: [.89, .32, .24],
-      nm: [44, 47, 54, .86], nmTop: [17, 18, 22, .97], nmOut: [128, 132, 140, .85], nmChk: [146, 92, 14, .95], rankNo: [192, 57, 43], amberT: [146, 92, 14], grayT: [128, 132, 140], erGlow: 0, erR: .95, erA: .9 }
+      nm: [44, 47, 54, .86], nmTop: [17, 18, 22, .97], nmOut: [128, 132, 140, .85], nmChk: [146, 92, 14, .95], rankNo: [192, 57, 43], amberT: [146, 92, 14], grayT: [128, 132, 140], erGlow: 0, erR: 1.2, erA: 1, erAs: [1, .96, .9, .82], erHalo: 1, d2: 1.7, koff: [.4, .24, .1] }
   };
   let THEME = "dark", PAL = PALS.dark, INK, SILVER, WARM, CORAL, AMBER, GRAY, SAND;
   const LIGHT = (() => { const l = [-.42, .55, .72], n = Math.hypot(...l); return l.map(x => x / n); })();
-  const ER_R = [2.4, 1.8, 1.35, 1.05], ER_A = [1, .86, .68, .48];
+  const ER_R = [2.4, 1.8, 1.35, 1.05];
   const B1 = 350, B2 = 950, B3 = 1550;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, p) => [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p, a[2] + (b[2] - a[2]) * p];
@@ -181,10 +181,14 @@ const Holo = (() => {
       const e = ER[i]; if (skip && skip.has(i)) continue;
       p[0] = cx + (e.lng - C.lng) * cos0; p[1] = cy - (e.lat - C.lat) * 110.574 * k;
       if (p[0] < -pad || p[1] < -pad || p[0] > W + pad || p[1] > H + pad) continue;
-      const a = A * ER_A[e.cls] * dim * (.86 + .14 * Math.sin(t * .0017 + i * 1.7));
-      if (pass === 0) { if (PAL.erGlow) { const r = (6 + 3 * sc) * DPR * (e.cls ? 1 : 1.35); ctx.globalAlpha = PAL.erGlow * a; ctx.drawImage(SPR.glow, p[0] - r, p[1] - r, r * 2, r * 2); } }
+      const a = A * PAL.erAs[e.cls] * dim * (.86 + .14 * Math.sin(t * .0017 + i * 1.7));
+      if (pass === 0) {
+        if (PAL.erGlow) { const r = (6 + 3 * sc) * DPR * (e.cls ? 1 : 1.35); ctx.globalAlpha = PAL.erGlow * a; ctx.drawImage(SPR.glow, p[0] - r, p[1] - r, r * 2, r * 2); }
+        // 라이트: 응급실 점 둘레를 종이색으로 비워, 짙은 한반도 점 위에서도 응급실이 또렷하게 보이게 합니다.
+        else if (PAL.erHalo) { ctx.globalAlpha = 1; dot(p[0], p[1], ER_R[e.cls] * sc * DPR * PAL.erR + 1.4 * DPR, PAL.halo, PAL.erHalo * a); }
+      }
       else {
-        const r = ER_R[e.cls] * sc * DPR * PAL.erR; ctx.globalAlpha = a * PAL.erA; ctx.drawImage(SPR.dot, p[0] - r, p[1] - r, r * 2, r * 2);
+        const r = ER_R[e.cls] * sc * DPR * PAL.erR; ctx.globalAlpha = Math.min(1, a * PAL.erA); ctx.drawImage(SPR.dot, p[0] - r, p[1] - r, r * 2, r * 2);
         if (!e.cls) { ctx.globalAlpha = 1; ring(p[0], p[1], r + 3 * DPR, WARM, .3 * a, .8); if (S.phase === "korea" && !REDUCED) { const u = ((t / 4200) + i * .37) % 1; ring(p[0], p[1], r + (4 + 16 * u) * DPR, WARM, .16 * a * (1 - u), .8); } }
       }
     }
@@ -487,7 +491,7 @@ const Holo = (() => {
     const x0 = (lon0 - KC[1]) * cs - 2, y0 = -(lat0 + gh * dla - KC[0]) * ky - 2, c = document.createElement("canvas");
     c.width = Math.ceil(w * dlo * cs) + 4; c.height = Math.ceil(gh * dla * ky) + 4;
     const g = c.getContext("2d"), r = mulberry32(36127);
-    for (let i = 0; i < gh; i++) for (let j = 0; j < w; j++) { const v = m[i * w + j]; if (!v) continue; g.fillStyle = v === 1 ? rgba(PAL.dots, (.3 + .2 * r()).toFixed(2)) : rgba(PAL.dots, .08); g.fillRect((lon0 + (j + .5) * dlo - KC[1]) * cs - x0 - .6, -(lat0 + (i + .5) * dla - KC[0]) * ky - y0 - .6, 1.2, 1.2); }
+    for (let i = 0; i < gh; i++) for (let j = 0; j < w; j++) { const v = m[i * w + j]; if (!v) continue; g.fillStyle = v === 1 ? rgba(PAL.dots, (PAL.koff[0] + PAL.koff[1] * r()).toFixed(2)) : rgba(PAL.dots, PAL.koff[2]); g.fillRect((lon0 + (j + .5) * dlo - KC[1]) * cs - x0 - .6, -(lat0 + (i + .5) * dla - KC[0]) * ky - y0 - .6, 1.2, 1.2); }
     KOFF = { c, kref, x0, y0 };
   }
   function draw2D(t) {
@@ -498,7 +502,7 @@ const Holo = (() => {
         const x = GP[i], y = GP[i + 1], z = GP[i + 2], vx = M[0] * x + M[1] * y + M[2] * z, vy = M[3] * x + M[4] * y + M[5] * z, vz = M[6] * x + M[7] * y + M[8] * z;
         const sc = 1 + (1 - G.intro) * 2, den = Math.max(G.dist - vz * sc, .06), s = f / den, px = vx * sc * s, py = vy * sc * s;
         const occ = vz < hz && Math.hypot(px, py) < sil; let a = kind < .5 ? .5 : kind < 1.5 ? .2 : kind < 2.5 ? .3 * Math.pow(1 - Math.abs(vz), 3) : .9;
-        if (occ) a *= .1; a *= G.alpha;
+        if (occ) a *= .1; a = Math.min(1, a * G.alpha * PAL.d2);
         ctx.fillStyle = rgba(kind > 4.5 ? PAL.hot : PAL.dots, a); const sz = (kind > 4.5 ? 2 : 1.3) * DPR; ctx.fillRect(cx + px - sz / 2, cy - py - sz / 2, sz, sz);
       }
     }
@@ -510,7 +514,7 @@ const Holo = (() => {
       const o = S.o2, k = kd(), T = S.tint;
       for (let i = 0; i < FP.length; i += 16) {
         const b = clamp((F.bloom - FP[i + 6] * .55) / .45, 0, 1), e = 1 - Math.pow(1 - b, 3), kind = FP[i + 4];
-        let c = PAL.dots, a = (kind < .5 ? .4 : kind < 1.5 ? .5 : .18) * F.alpha * C.alpha * e;
+        let c = PAL.dots, a = Math.min(1, (kind < .5 ? .4 : kind < 1.5 ? .5 : .18) * PAL.d2) * F.alpha * C.alpha * e;
         if (kind > .5 && kind < 1.5) { const gi = Math.min(15, FP[i + 5]) * 4; c = [Math.round(T[gi] * 255), Math.round(T[gi + 1] * 255), Math.round(T[gi + 2] * 255)]; a *= T[gi + 3]; }
         ctx.fillStyle = rgba(c, a); ctx.fillRect(o[0] + FP[i] * e * k - DPR / 2, o[1] - FP[i + 1] * e * k - DPR / 2, 1.3 * DPR, 1.3 * DPR);
       }

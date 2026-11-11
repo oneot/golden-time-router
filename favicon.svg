@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🚨</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .l { stroke: #121317; } .o { fill: #121317; } .c { stroke: #e5533e; }
+    @media (prefers-color-scheme: dark) { .l { stroke: #d6dbe4; } .o { fill: #fff; } .c { stroke: #ff7b6b; } }
+  </style>
+  <circle class="l" cx="16" cy="16" r="13.2" fill="none" stroke-opacity=".5" stroke-width="1.7"/>
+  <ellipse class="l" cx="16" cy="16" rx="13.2" ry="4.9" fill="none" stroke-opacity=".26" stroke-width="1.4"/>
+  <path class="c" d="M8.3 20.9C11.5 13.3 17 9.3 23 8.9" fill="none" stroke-width="2.3" stroke-linecap="round"/>
+  <circle class="c" cx="23.3" cy="8.9" r="2.8" fill="none" stroke-width="2"/>
+  <circle class="o" cx="8.3" cy="20.9" r="2.3"/>
+</svg>

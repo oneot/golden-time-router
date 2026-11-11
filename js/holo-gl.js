@@ -130,7 +130,12 @@ void main() {
     float rr = (one ? 1.17 : 1.28) + 0.04 * sin(1.5 * th + ph * 2.0);
     edge = smoothstep(0.8, 1.0, abs(aPos.z));
     v = rd * rr + (B[2] * cos(tw) + rd * (0.55 * sin(tw))) * (aPos.z * w) + B[2] * ((fract(seed * 91.7) - 0.5) * 0.006);
-  } else v = uRot * aPos;
+  } else {
+    vec3 pp = aPos;
+    // 라이트: 육지·바다 점을 조금씩 흩어 격자 무늬 대신 손으로 찍은 점묘처럼 보이게 합니다.
+    if (uTheme > 0.5 && kind < 1.5) { vec3 t1 = normalize(cross(aPos, abs(aPos.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0))), t2 = cross(aPos, t1); pp = normalize(aPos + (t1 * (fract(seed * 13.17) - 0.5) + t2 * (fract(seed * 29.71) - 0.5)) * 0.009); }
+    v = uRot * pp;
+  }
   vec3 n = normalize(v);
   v *= mix(2.4 + 2.4 * fract(seed * 3.7), 1.0, uIntro);
   float den = max(uDist - v.z, 0.06);
@@ -141,26 +146,32 @@ void main() {
   float lam = max(dot(n, uLight), 0.0), rim = pow(1.0 - abs(n.z), 2.0), a;
   // 다크: 은색 점이 빛을 받는 쪽에서 밝아집니다. 라이트: 먹색 점이 그늘 쪽과 가장자리에서 짙어집니다(연필 음영).
   vec3 col = uInk; bool lt = uTheme > 0.5; float sh = 1.0 - lam;
-  if (kind < 0.5) a = lt ? 0.22 + 0.26 * sh + 0.08 * rim : 0.2 + 0.52 * lam + 0.3 * rim;
-  else if (kind < 1.5) a = lt ? 0.06 + 0.08 * sh + 0.05 * rim : 0.06 + 0.12 * lam + 0.16 * rim;
-  else if (kind < 2.5) a = 0.5 * pow(rim, 1.5) * (lt ? 0.12 : 1.0);
-  else if (kind < 3.5) a = (0.085 + 0.24 * edge) * env * (lt ? 0.6 + 0.3 * sh : 0.65 + 0.45 * lam);
-  else if (kind < 4.5) a = lt ? 0.06 : 0.32;
+  if (kind < 0.5) a = lt ? 0.62 + 0.3 * sh + 0.25 * rim : 0.2 + 0.52 * lam + 0.3 * rim;
+  else if (kind < 1.5) a = lt ? 0.2 + 0.16 * sh + 0.12 * rim : 0.06 + 0.12 * lam + 0.16 * rim;
+  else if (kind < 2.5) a = 0.5 * pow(rim, 1.5) * (lt ? 0.3 : 1.0);
+  else if (kind < 3.5) a = (0.085 + 0.24 * edge) * env * (lt ? 1.2 + 0.5 * sh : 0.65 + 0.45 * lam);
+  else if (kind < 4.5) a = lt ? 0.08 : 0.32;
   else { a = 0.9 * (0.78 + 0.22 * sin(uTime * 1.7 + seed * 40.0)); col = uHot; }
-  if (kind < 3.5) a *= 0.86 + 0.14 * sin(uTime * (0.5 + fract(seed * 3.1)) + seed * 40.0);
+  if (kind < 3.5) a *= lt ? 0.94 + 0.06 * sin(uTime * (0.5 + fract(seed * 3.1)) + seed * 40.0) : 0.86 + 0.14 * sin(uTime * (0.5 + fract(seed * 3.1)) + seed * 40.0);
+  // 라이트 점묘: 작고 옅은 점 절반, 보통 점, 크고 새까만 점 10%를 섞어 OpenAI 점묘처럼 짙고 거친 결을 냅니다.
+  float sm = 1.0;
+  if (lt && kind < 3.5) { float q = fract(seed * 7.77); sm = q < 0.5 ? 0.74 : q < 0.9 ? 1.0 : 1.55; a *= q < 0.5 ? 0.72 : q < 0.9 ? 1.2 : 1.6; }
   // 가까이 내려가면 점 사이 간격이 벌어져 격자처럼 보이므로, 간격(px)이 커지는 만큼 육지·바다·대기 점을 지웁니다.
   if (kind < 2.5) a *= 1.0 - smoothstep(3.5 * uDPR, 9.0 * uDPR, uF / den * 0.0095);
   float blur = occl > 0.5 ? 0.9 : clamp((0.25 - n.z) * 0.7, 0.0, 0.6);
   blur = max(blur, clamp((v.z - 1.04) * 1.5, 0.0, 1.0));
   if (kind > 3.5 && kind < 4.5) blur = max(blur, 0.55 + 0.45 * fract(seed * 5.3));
-  float px = size * uDPR * (uDist / den) * (1.0 + 1.3 * blur);
+  float px = size * sm * uDPR * (uDist / den) * (1.0 + 1.3 * blur);
   if (occl > 0.5) a *= 0.085;
   a /= 1.0 + 1.3 * blur;
-  float big = clamp((px - 3.0) / 14.0, 0.0, 1.0);
-  if (px > 3.0) a *= max(9.0 / (px * px), 0.02);
+  // 큰 점은 면적만큼 옅게. 라이트는 이 기준을 화면 배율(uDPR)에 맞춰, 레티나에서 보통 점까지 옅어지지 않게 합니다.
+  float ref = lt ? 3.6 * uDPR : 3.0;
+  float big = clamp((px - ref) / 14.0, 0.0, 1.0);
+  if (px > ref) a *= max(ref * ref / (px * px), 0.02);
   if (px < 1.5) { a *= px / 1.5; px = 1.5; }
+  if (lt) a = min(a, 1.0);
   gl_PointSize = min(px, 72.0);
-  vA = a * uAlpha; vCol = col; vSoft = mix(0.5, 0.0, clamp(blur + big, 0.0, 1.0));
+  vA = a * uAlpha; vCol = col; vSoft = mix(lt ? 0.7 : 0.5, 0.0, clamp(blur + big, 0.0, 1.0));
   vec2 q = uCenter + vec2(sp.x, -sp.y);
   gl_Position = vec4(q.x / uRes.x * 2.0 - 1.0, 1.0 - q.y / uRes.y * 2.0, 0.0, 1.0);
   if (uDist - v.z < 0.07 || uAlpha < 0.002) gl_Position = vec4(3.0, 3.0, 0.0, 1.0);
@@ -170,19 +181,22 @@ attribute vec4 aP; attribute vec2 aE;
 uniform vec2 uRes, uC, uLL, uK; uniform vec3 uInk; uniform float uAlpha, uDPR, uTime, uTheme;
 varying vec3 vCol; varying float vA, vSoft;
 void main() {
-  float kind = aP.z, seed = aP.w, edge = aE.x;
-  vec2 q = uC + vec2((aP.y - uLL.y) * uK.x, -(aP.x - uLL.x) * uK.y);
+  float kind = aP.z, seed = aP.w, edge = aE.x, lt = uTheme > 0.5 ? 1.0 : 0.0;
+  vec2 ll = aP.xy + lt * vec2((fract(seed * 13.17) - 0.5) * 0.012, (fract(seed * 29.71) - 0.5) * 0.015);
+  vec2 q = uC + vec2((ll.y - uLL.y) * uK.x, -(ll.x - uLL.x) * uK.y);
   float cell = 0.02 * uK.y;
   // 확대되면 0.02도 격자가 드러나기 전에 지우고, 멀리서 점이 겹쳐 하얗게 뭉치면 면적만큼 옅게 합니다.
   float fade = (1.0 - smoothstep(2.6 * uDPR, 6.5 * uDPR, cell)) * min(1.0, pow(cell / (1.5 * uDPR), 2.0));
-  float a = kind < 1.5 ? (0.26 + 0.2 * seed) * (1.0 + 0.85 * edge) * (uTheme > 0.5 ? 0.8 : 1.0) : (0.06 + 0.05 * seed) * (uTheme > 0.5 ? 0.8 : 1.0);
+  float a = uTheme > 0.5 ? (kind < 1.5 ? (0.48 + 0.24 * seed) * (1.0 + 0.55 * edge) : 0.1 + 0.08 * seed) : (kind < 1.5 ? (0.26 + 0.2 * seed) * (1.0 + 0.85 * edge) : 0.06 + 0.05 * seed);
+  float sq = fract(seed * 7.77), sm = 1.0;
+  if (lt > 0.5) { sm = sq < 0.5 ? 0.85 : sq < 0.9 ? 1.05 : 1.5; a *= sq < 0.5 ? 0.6 : sq < 0.9 ? 0.95 : 1.35; }
   // 북한·중국·일본은 격자 경계(북위 32~40.2도, 동경 123~132도)에서 잘려 보이지 않게 가장자리로 갈수록 옅게
   vec2 g = abs((aP.xy - vec2(36.11, 127.5)) / vec2(4.11, 4.5));
   if (kind > 1.5) a *= 1.0 - smoothstep(0.62, 0.97, max(g.x, g.y));
   a *= fade * uAlpha * (0.88 + 0.12 * sin(uTime * 0.7 + seed * 50.0));
-  float px = clamp(cell * 0.4, uDPR, 2.6 * uDPR);
+  float px = clamp(cell * 0.4, uDPR, 2.6 * uDPR) * sm;
   if (px < 1.5) { a *= px / 1.5; px = 1.5; }
-  gl_PointSize = px; vA = a; vCol = uInk; vSoft = 0.45;
+  gl_PointSize = px; vA = uTheme > 0.5 ? min(a, 1.0) : a; vCol = uInk; vSoft = uTheme > 0.5 ? 0.62 : 0.45;
   gl_Position = vec4(q.x / uRes.x * 2.0 - 1.0, 1.0 - q.y / uRes.y * 2.0, 0.0, 1.0);
   if (fade * uAlpha < 0.002) gl_Position = vec4(3.0, 3.0, 0.0, 1.0);
 }`,
@@ -192,7 +206,8 @@ uniform vec2 uRes, uCenter; uniform vec3 uInk; uniform float uK, uTime, uAlpha, 
 uniform vec4 uTint[16];
 varying vec3 vCol; varying float vA, vSoft;
 void main() {
-  vec2 p = aA.xy; float size = aA.z, seed = aA.w, kind = aB.x, grp = aB.y, delay = aB.z, core = aB.w, w = 0.0;
+  vec2 p = aA.xy; float size = aA.z, seed = aA.w, kind = aB.x, grp = aB.y, delay = aB.z, core = aB.w, w = 0.0, sa = 1.0;
+  if (uTheme > 0.5) { float q = fract(seed * 7.77); size *= q < 0.5 ? 0.85 : q < 0.9 ? 1.08 : 1.55; sa = q < 0.5 ? 0.65 : q < 0.9 ? 1.05 : 1.4; }
   if (kind < 0.5) w = (mod(grp, 2.0) < 0.5 ? 0.012 : -0.008) * (0.9 + 0.2 * fract(seed * 5.1));
   else if (kind > 1.5) w = 0.004;
   float c = cos(uTime * w), s = sin(uTime * w);
@@ -203,7 +218,7 @@ void main() {
   vec2 q = uCenter + vec2(p.x, -p.y) * uK;
   vec3 col = uInk; float am = 1.0;
   if (kind > 0.5 && kind < 1.5) { vec4 tc = uTint[int(clamp(grp, 0.0, 15.0) + 0.5)]; col = mix(col, tc.rgb, core > 0.5 ? 1.0 : 0.4); am = tc.a; }
-  float a = (kind < 0.5 ? 0.34 : kind < 1.5 ? 0.46 : 0.16) * am * (uTheme > 0.5 ? (kind < 0.5 ? 0.62 : kind < 1.5 ? 0.9 : 0.3) : 1.0);
+  float a = (kind < 0.5 ? 0.34 : kind < 1.5 ? 0.46 : 0.16) * am * (uTheme > 0.5 ? (kind < 0.5 ? 1.5 : kind < 1.5 ? 1.55 : 1.3) * sa : 1.0);
   float dep = fract(seed * 17.31), blur = dep > 0.93 ? (dep - 0.93) * 12.0 : 0.0;
   // 라이트에서는 초점 밖 큰 점이 종이 위 얼룩처럼 보이므로 거의 지웁니다.
   if (uTheme > 0.5) a *= 1.0 - 0.85 * clamp(blur, 0.0, 1.0);
@@ -211,7 +226,7 @@ void main() {
   a /= 1.0 + 2.0 * blur * blur;
   if (px < 1.5) { a *= px / 1.5; px = 1.5; }
   gl_PointSize = px;
-  vA = a * e * uAlpha; vCol = col; vSoft = mix(0.5, 0.0, clamp(blur, 0.0, 1.0));
+  vA = uTheme > 0.5 ? min(a * e * uAlpha, 1.0) : a * e * uAlpha; vCol = col; vSoft = mix(uTheme > 0.5 ? 0.68 : 0.5, 0.0, clamp(blur, 0.0, 1.0));
   gl_Position = vec4(q.x / uRes.x * 2.0 - 1.0, 1.0 - q.y / uRes.y * 2.0, 0.0, 1.0);
 }`,
   pointFS: `precision mediump float;

@@ -10,7 +10,9 @@
   // 테마: 기본은 다크. 주소의 ?theme=light|dark, 없으면 이 브라우저에 저장한 선택을 따릅니다. 첫 화면이 깜빡이지 않게 CSS보다 먼저 정합니다.
   (() => { let t = new URLSearchParams(location.search).get("theme"); if (t !== "light" && t !== "dark") { try { t = localStorage.getItem("gtr-theme"); } catch (e) { t = null; } } if (t === "light") { document.documentElement.dataset.theme = "light"; document.querySelector('meta[name="theme-color"]').content = "#f4f3f0"; } })();
 </script>
+<link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

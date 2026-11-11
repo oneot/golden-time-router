@@ -298,7 +298,7 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
 [data-theme="light"] .chip.sa { border-color: rgba(229, 83, 62, .35); }
 [data-theme="light"] .stages li.done i { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5 9.5 17 19 7.5'/%3E%3C/svg%3E"); }
 [data-theme="light"] #webchat .webchat__render-markdown code { background: rgba(18, 19, 23, .05); }
-[data-theme="light"] .stage::before { background: radial-gradient(56% 50% at 50% 54%, rgba(255, 255, 255, .7), transparent 72%); }
+[data-theme="light"] .stage::before { background: radial-gradient(60% 54% at 50% 54%, rgba(255, 255, 255, .92), rgba(255, 255, 255, .5) 55%, transparent 78%); }
 [data-theme="light"] .hud { text-shadow: 0 0 16px rgba(244, 243, 240, .95), 0 0 4px rgba(244, 243, 240, .9); }
 [data-theme="light"] .lg .e { background: var(--ink); box-shadow: 0 0 5px rgba(18, 19, 23, .25); }
 [data-theme="light"] .lg .o { background: var(--ink); box-shadow: 0 0 0 2px rgba(18, 19, 23, .14); }
