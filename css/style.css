@@ -253,5 +253,5 @@ body.is-working .composer::after { opacity: 1; animation: sweep 1.9s var(--ease)
   .foot { height: auto; white-space: normal; flex-wrap: wrap; }
 }
 @media (min-width: 1181px) and (max-height: 1000px) { .m-sub, .hint, .stages span { display: none; } .m-title { margin-top: 10px; font-size: 20px; } .stages li { padding-bottom: 9px; } .composer { margin-top: 12px; } .pipe-note { margin-bottom: 12px; } }
-@media (min-width: 1181px) and (max-height: 760px) { .app { height: auto; } .stage { min-height: 640px; } .brief { min-height: 360px; } }
+@media (min-width: 1181px) and (max-height: 760px) { .brief { flex-basis: 200px; } .hud-state { font-size: 22px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; } }
